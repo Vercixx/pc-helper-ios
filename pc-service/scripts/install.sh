@@ -72,14 +72,22 @@ fi
 mkdir -p "$UNIT_DIR"
 install -m 644 "$REPO_DIR/systemd/wol-unlock.service" "$UNIT_DIR/wol-unlock.service"
 systemctl --user daemon-reload
+# Clear any start-limit state from a previous failed install, or systemd
+# refuses to start the unit again and reports "start request repeated too
+# quickly" instead of whatever the real problem now is.
+systemctl --user reset-failed wol-unlock.service 2>/dev/null || true
 systemctl --user enable --now wol-unlock.service
-sleep 1
+sleep 2
 
 if systemctl --user is-active --quiet wol-unlock.service; then
     ok "service is running"
 else
     warn "service did not start; recent log:"
-    journalctl --user -u wol-unlock.service -n 20 --no-pager || true
+    journalctl --user -u wol-unlock.service -n 25 --no-pager || true
+    echo
+    warn "after fixing the cause, retry with:"
+    echo "    systemctl --user reset-failed wol-unlock.service"
+    echo "    systemctl --user start wol-unlock.service"
     exit 1
 fi
 

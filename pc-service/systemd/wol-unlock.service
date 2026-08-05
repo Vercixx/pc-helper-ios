@@ -15,6 +15,9 @@ ExecStart=%h/.local/share/wol-unlock/venv/bin/wol-unlock
 Restart=on-failure
 RestartSec=5s
 Environment=PYTHONUNBUFFERED=1
+# The code chmods the key, the database and the socket to 0600 explicitly; this
+# closes the window between creation and chmod, and covers anything added later.
+UMask=0077
 
 # --- Privilege ------------------------------------------------------------
 # Nothing here needs elevation. logind grants UnlockSession without consulting
@@ -26,7 +29,12 @@ NoNewPrivileges=yes
 # --- Filesystem -----------------------------------------------------------
 ProtectSystem=strict
 ProtectHome=read-only
+# State: the server key, the device table and the replay cache.
 ReadWritePaths=%h/.local/share/wol-unlock
+# $XDG_RUNTIME_DIR, where the 0600 control socket is bound. ProtectSystem=strict
+# mounts the whole hierarchy read-only -- including /run -- so without this the
+# service starts, opens its database, and then dies with EROFS on bind().
+ReadWritePaths=%t
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
@@ -53,16 +61,12 @@ CapabilityBoundingSet=
 # via ifaddr) goes through it. AF_UNIX carries the control socket and D-Bus.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 
-# Makes "LAN only" a property the kernel enforces rather than a convention the
-# code follows. Narrow these to your actual subnet if you like.
-# Requires BPF cgroup support; systemd logs a warning and continues without it.
-IPAddressDeny=any
-IPAddressAllow=localhost
-IPAddressAllow=10.0.0.0/8
-IPAddressAllow=172.16.0.0/12
-IPAddressAllow=192.168.0.0/16
-IPAddressAllow=169.254.0.0/16
-IPAddressAllow=224.0.0.0/4
+# NOTE: IPAddressDeny=/IPAddressAllow= are deliberately absent. They install a
+# BPF cgroup filter, which requires root; in a --user unit systemd only logs
+# "unit configures an IP firewall, but not running as root" and ignores them.
+# Leaving them in would imply a kernel-level guarantee that is not actually in
+# force. LAN-only is enforced in the service itself, by the peer-address check
+# against http.allowed_networks that runs before any request is parsed.
 
 [Install]
 WantedBy=default.target

@@ -32,8 +32,8 @@ another.
 `unlock-session` action; logind consults polkit only when the caller's uid
 differs from the session's. Running as the desktop user therefore needs no sudo,
 no setuid binary, and no polkit rule. The systemd unit can then be locked down
-hard (`ProtectSystem=strict`, `NoNewPrivileges`, `IPAddressDeny=any`) because
-nothing it does requires privilege.
+hard (`ProtectSystem=strict`, `ProtectHome=read-only`, `NoNewPrivileges`,
+`SystemCallFilter=@system-service`) because nothing it does requires privilege.
 
 **Pairing needs physical access, structurally.** Opening a pairing window is only
 reachable over a `0600` Unix socket in `$XDG_RUNTIME_DIR`, guarded by an
@@ -174,5 +174,7 @@ loginctl show-session 1 -p LockedHint     # LockedHint=no   ← the real proof
 - **No TLS**, so a LAN observer sees which action was requested and when. They
   cannot forge, replay, or alter it. Noise_IK over the same identities is the
   documented upgrade path.
-- **WAN exposure is a non-goal.** Reach the LAN over a VPN instead; the service
-  binds to private ranges and the unit enforces that at the kernel level.
+- **WAN exposure is a non-goal.** Reach the LAN over a VPN instead. Requests
+  from outside `http.allowed_networks` are dropped before any parsing, but that
+  is the service enforcing it, not the kernel: `IPAddressDeny=` needs root and
+  is silently ignored in a `--user` unit, so it is not used here.

@@ -581,6 +581,9 @@ responses are signed and bound to the request nonce.
   cannot forge, replay, or alter it. Noise_IK over the same identities is the
   documented upgrade path.
 - Root on the PC, or a compromised iOS device, defeats everything below it.
-- WAN exposure is a non-goal. Reach the LAN over a VPN instead; the service binds
-  to private ranges and the systemd unit enforces this at the kernel level with
-  `IPAddressDeny`/`IPAddressAllow`.
+- WAN exposure is a non-goal. Reach the LAN over a VPN instead. Requests from
+  outside `http.allowed_networks` are rejected at step 1 of §3.2, before any
+  parsing — but that check is the service's own, not the kernel's.
+  `IPAddressDeny=`/`IPAddressAllow=` install a BPF cgroup filter that requires
+  root, so systemd ignores them in a `--user` unit; relying on them here would
+  claim a guarantee that is not in force.
