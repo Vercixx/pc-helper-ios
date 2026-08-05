@@ -18,11 +18,15 @@
       "bundleIdentifier": "com.vercixx.wolunlock",
       "buildNumber": "1",
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.vercixx.wolunlock"]
+        "com.apple.security.application-groups": [
+          "group.com.vercixx.wolunlock"
+        ]
       },
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "PC Unlock finds your computer on this network and sends it wake and unlock commands. Without this permission it cannot reach your PC.",
-        "NSBonjourServices": ["_wol-unlock._tcp"],
+        "NSBonjourServices": [
+          "_wol-unlock._tcp"
+        ],
         "NSCameraUsageDescription": "Scan the pairing QR code shown on your PC.",
         "NSFaceIDUsageDescription": "Face ID protects the key that unlocks your PC.",
         "NSAppTransportSecurity": {
@@ -52,7 +56,7 @@
         }
       ],
       "expo-local-authentication",
-      "@bacons/apple-targets"
+      "./plugins/withAppIntents"
     ],
     "experiments": {
       "typedRoutes": true
