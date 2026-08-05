@@ -5,7 +5,7 @@
 
 import { Button, ContextMenu, HStack, Host, Image, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import { font, foregroundColor, frame, padding } from "@expo/ui/swift-ui/modifiers";
-import { Link, Stack, useFocusEffect, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -66,6 +66,7 @@ export default function PCListScreen() {
 }
 
 function EmptyState() {
+  const router = useRouter();
   return (
     <View style={shared.centered}>
       <RNText style={local.emptyGlyph}>🖥️</RNText>
@@ -74,11 +75,15 @@ function EmptyState() {
         On your Linux PC run <RNText style={shared.mono}>wol-unlockctl pair</RNText>, then
         tap ＋ to scan the code it shows.
       </RNText>
-      <Link href="/discover" asChild>
-        <Pressable style={[shared.primaryButton, local.stretch]}>
-          <RNText style={shared.primaryButtonLabel}>Add a PC</RNText>
-        </Pressable>
-      </Link>
+      {/* Not <Link asChild>: it clones the child with its own props, which
+          clobbers an array `style` and drops the button's background. */}
+      <Pressable
+        style={[shared.primaryButton, local.stretch]}
+        accessibilityRole="button"
+        onPress={() => router.push("/discover")}
+      >
+        <RNText style={shared.primaryButtonLabel}>Add a PC</RNText>
+      </Pressable>
     </View>
   );
 }

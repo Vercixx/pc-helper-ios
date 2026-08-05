@@ -122,7 +122,10 @@ export default function PCDetailScreen() {
             label="Wake targets"
             value={pc.wake.macs.length > 0 ? pc.wake.macs.join("\n") : "none configured"}
           />
-          <Detail label="Key protection" value={pc.keyMode === "biometric" ? "Face ID" : "Device passcode"} />
+          <Detail
+            label="Unlock confirmation"
+            value={pc.requireBiometricsForUnlock === false ? "None" : "Face ID / passcode"}
+          />
           <Detail label="This device's ID" value={pc.deviceId} mono />
           <Detail label="PC fingerprint" value={pc.serverFp} mono />
           <Detail label="Paired" value={new Date(pc.pairedAt).toLocaleString()} />

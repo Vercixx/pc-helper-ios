@@ -6,7 +6,7 @@
  * fingerprint against the one in the code the user scans or types.
  */
 
-import { Link, Stack, useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useMemo } from "react";
 import {
   ActivityIndicator,
@@ -35,27 +35,34 @@ export default function DiscoverScreen() {
     <>
       <Stack.Screen options={{ title: "Add a PC" }} />
       <ScrollView style={shared.screen} contentContainerStyle={local.content}>
-        <Link href="/scan" asChild>
-          <Pressable style={[shared.card, local.primaryCard]}>
-            <Text style={local.cardGlyph}>􀎼</Text>
-            <View style={local.grow}>
-              <Text style={shared.body}>Scan QR code</Text>
-              <Text style={shared.caption}>
-                The fastest way. Run <Text style={shared.mono}>wol-unlockctl pair</Text> on
-                the PC.
-              </Text>
-            </View>
-          </Pressable>
-        </Link>
-
-        <Link href={{ pathname: "/pair", params: {} }} asChild>
-          <Pressable style={shared.card}>
-            <Text style={shared.body}>Enter details manually</Text>
+        {/* Plain Pressables rather than <Link asChild>: asChild clones the
+            child with the Link's own props, which clobbers an array `style`
+            and silently drops the card background. */}
+        <Pressable
+          style={[shared.card, local.primaryCard]}
+          accessibilityRole="button"
+          onPress={() => router.push("/scan")}
+        >
+          <Text style={local.cardGlyph}>📷</Text>
+          <View style={local.grow}>
+            <Text style={shared.body}>Scan QR code</Text>
             <Text style={shared.caption}>
-              If the PC is on another subnet or discovery is blocked.
+              The fastest way. Run <Text style={shared.mono}>wol-unlockctl pair</Text> on the
+              PC.
             </Text>
-          </Pressable>
-        </Link>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={shared.card}
+          accessibilityRole="button"
+          onPress={() => router.push("/pair")}
+        >
+          <Text style={shared.body}>Enter details manually</Text>
+          <Text style={shared.caption}>
+            If the PC is on another subnet or discovery is blocked.
+          </Text>
+        </Pressable>
 
         <Text style={local.sectionHeader}>ON THIS NETWORK</Text>
 

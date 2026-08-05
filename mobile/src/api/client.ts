@@ -140,7 +140,8 @@ function parseEnvelope<T>(rawBody: string, status: number): T {
 /**
  * A signed call to a paired PC.
  *
- * `prompt` is what the Face ID sheet says when the key is biometry-protected.
+ * Never prompts for biometrics: that gate is applied by the caller, on the
+ * action, so that a background status poll cannot trigger a Face ID sheet.
  */
 async function signedCall<T>(
   pc: LinkedPC,
@@ -148,7 +149,7 @@ async function signedCall<T>(
   method: "GET" | "POST",
   path: string,
   payload?: unknown,
-  options: { timeoutMs?: number; prompt?: string } = {},
+  options: { timeoutMs?: number } = {},
 ): Promise<T> {
   const bodyText = payload === undefined ? "" : JSON.stringify(payload);
   const nonce = newNonce();
@@ -164,12 +165,7 @@ async function signedCall<T>(
     serverFp: pc.serverFp,
   });
 
-  const signature = await signWithDeviceKey(
-    pc.keyAlias,
-    message,
-    pc.keyMode,
-    options.prompt ?? "Confirm it's you",
-  );
+  const signature = await signWithDeviceKey(pc.keyAlias, message, pc.keyMode);
 
   const response = await fetchWithTimeout(
     `${baseUrl(endpoint)}${path}`,
@@ -217,9 +213,7 @@ export async function fetchServerInfo(
 }
 
 export async function getStatus(pc: LinkedPC, endpoint: Endpoint): Promise<StatusResponse> {
-  return signedCall<StatusResponse>(pc, endpoint, "GET", "/v1/status", undefined, {
-    prompt: "Check your PC's status",
-  });
+  return signedCall<StatusResponse>(pc, endpoint, "GET", "/v1/status");
 }
 
 export async function unlockSession(
@@ -233,7 +227,6 @@ export async function unlockSession(
     "POST",
     "/v1/unlock",
     { session_id: sessionId },
-    { prompt: `Unlock ${pc.name}` },
   );
 }
 
@@ -242,9 +235,7 @@ export async function relayWake(
   endpoint: Endpoint,
   target: string = "self",
 ): Promise<WakeResponse> {
-  return signedCall<WakeResponse>(pc, endpoint, "POST", "/v1/wake", { target }, {
-    prompt: `Wake ${pc.name}`,
-  });
+  return signedCall<WakeResponse>(pc, endpoint, "POST", "/v1/wake", { target });
 }
 
 /**

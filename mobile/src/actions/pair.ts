@@ -84,7 +84,7 @@ function phoneName(): string {
   return model ? `${model}` : "iPhone";
 }
 
-export type PairOutcome = { pc: LinkedPC; usedBiometrics: boolean };
+export type PairOutcome = { pc: LinkedPC };
 
 /**
  * Run the full enrollment.
@@ -101,7 +101,7 @@ export async function pairWithPC(input: {
   fallbackName?: string;
 }): Promise<PairOutcome> {
   const alias = newKeyAlias();
-  const key = await createDeviceKey(alias, "biometric");
+  const key = await createDeviceKey(alias);
 
   try {
     const result = await pairApi({
@@ -112,8 +112,7 @@ export async function pairWithPC(input: {
       deviceName: phoneName(),
       // Signing the proof reads the seed back out of the keychain, which is
       // also a live check that we can use the key we just created.
-      signProof: (message) =>
-        signWithDeviceKey(alias, message, key.mode, "Pair with your PC"),
+      signProof: (message) => signWithDeviceKey(alias, message),
     });
 
     if (result.device_id !== key.deviceId) {
@@ -137,7 +136,8 @@ export async function pairWithPC(input: {
       port: input.endpoint.port,
       deviceId: result.device_id,
       keyAlias: alias,
-      keyMode: key.mode,
+      keyMode: "device-only",
+      requireBiometricsForUnlock: true,
       wake: {
         macs: result.wake?.macs ?? [],
         broadcast: result.wake?.broadcast ?? "255.255.255.255",
@@ -149,7 +149,7 @@ export async function pairWithPC(input: {
     };
 
     usePCStore.getState().addOrReplacePC(pc);
-    return { pc, usedBiometrics: key.mode === "biometric" };
+    return { pc };
   } catch (error) {
     // Never leave an orphaned key in the keychain for a pairing that failed.
     await deleteDeviceKey(alias);

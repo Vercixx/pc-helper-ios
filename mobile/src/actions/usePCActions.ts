@@ -11,6 +11,7 @@ import { getStatus, unlockSession } from "@/api/client";
 import { resolveAndRemember } from "@/api/endpoint";
 import { ApiError } from "@/api/types";
 import { sendWakePackets, waitUntilAwake } from "@/actions/wake";
+import { confirmBiometrics, migrateToDeviceOnly } from "@/crypto/keys";
 import { usePCStore } from "@/state/store";
 import type { LinkedPC } from "@/state/types";
 
@@ -36,10 +37,25 @@ export function usePCActions(pc: LinkedPC | undefined) {
     [pc, updatePC],
   );
 
+  /**
+   * Move a legacy biometry-protected seed to device-only storage.
+   *
+   * Records paired before the gate moved prompt for Face ID on every read,
+   * which meant a prompt per PC every time the list appeared. This costs one
+   * final prompt and then stops, rather than forcing the user to re-pair.
+   */
+  const ensureMigrated = useCallback(async () => {
+    if (!pc || pc.keyMode !== "biometric") return;
+    if (await migrateToDeviceOnly(pc.keyAlias)) {
+      updatePC(pc.id, { keyMode: "device-only" });
+    }
+  }, [pc, updatePC]);
+
   const refresh = useCallback(async () => {
     if (!pc) return;
     setBusy("status");
     try {
+      await ensureMigrated();
       const endpoint = await resolveAndRemember(pc, remember);
       const status = await getStatus(pc, endpoint);
       setStatus(pc.id, {
@@ -63,7 +79,7 @@ export function usePCActions(pc: LinkedPC | undefined) {
     } finally {
       setBusy(null);
     }
-  }, [pc, remember, setStatus, updatePC]);
+  }, [pc, ensureMigrated, remember, setStatus, updatePC]);
 
   const wake = useCallback(async () => {
     if (!pc) return;
@@ -121,6 +137,17 @@ export function usePCActions(pc: LinkedPC | undefined) {
     setBusy("unlock");
     setFeedback(null);
     try {
+      await ensureMigrated();
+
+      // The one place biometrics are asked for. Unlocking a PC is the action
+      // worth confirming; checking whether it is online is not.
+      if (pc.requireBiometricsForUnlock !== false) {
+        if (!(await confirmBiometrics(`Unlock ${pc.name}`))) {
+          setFeedback({ tone: "error", message: "Cancelled." });
+          return;
+        }
+      }
+
       const endpoint = await resolveAndRemember(pc, remember);
       const result = await unlockSession(pc, endpoint);
       setFeedback({
@@ -145,7 +172,7 @@ export function usePCActions(pc: LinkedPC | undefined) {
     } finally {
       setBusy(null);
     }
-  }, [pc, remember, setStatus, updatePC]);
+  }, [pc, ensureMigrated, remember, setStatus, updatePC]);
 
   const cancelWake = useCallback(() => {
     wakeAbort.current?.abort();

@@ -28,7 +28,15 @@ export type LinkedPC = {
   deviceId: string;
   /** Keychain alias for our private seed. */
   keyAlias: string;
+  /**
+   * How the seed is stored. Always `"device-only"` for anything paired since
+   * the biometric gate moved onto the unlock action; `"biometric"` marks a
+   * legacy record that still needs migrating.
+   */
   keyMode: KeyStorageMode;
+  /** Ask for Face ID / passcode before unlocking. Undefined on legacy records,
+   * which are treated as requiring it. */
+  requireBiometricsForUnlock?: boolean;
 
   wake: { macs: string[]; broadcast: string; port: number };
   capabilities: string[];

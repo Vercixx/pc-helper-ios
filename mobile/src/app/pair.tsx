@@ -79,7 +79,7 @@ export default function PairScreen() {
       }
 
       setPhase("waiting");
-      const { pc, usedBiometrics } = await pairWithPC({
+      const { pc } = await pairWithPC({
         endpoint,
         code: normalizeCode(code),
         expectedFingerprint: expected,
@@ -88,11 +88,6 @@ export default function PairScreen() {
       });
 
       setPhase("done");
-      if (!usedBiometrics) {
-        setNote(
-          "Paired. Face ID isn't set up on this phone, so the key is protected by the device passcode only.",
-        );
-      }
       router.replace({ pathname: "/pc/[id]", params: { id: pc.id } });
     } catch (cause) {
       setPhase("form");

@@ -6,13 +6,27 @@
  * `expo-secure-store`; only that seed is secret, and it never appears in the
  * zustand store, in AsyncStorage, or in any log.
  *
- * An Ed25519 private key *is* 32 uniformly random bytes, so the seed comes
+ * Where the biometric gate lives
+ * ------------------------------
+ * The seed is stored *without* `requireAuthentication`, protected by
+ * `WHEN_UNLOCKED_THIS_DEVICE_ONLY` — readable only while the phone itself is
+ * unlocked, and never restorable to another device.
+ *
+ * Keychain-level biometry was the original design and was wrong in practice:
+ * every signed request reads the seed, including the background status poll on
+ * the PC list, so simply looking at the list produced a Face ID prompt per PC
+ * per visit. The gate now sits on the *action* instead
+ * (:func:`confirmBiometrics`, called before unlocking), which prompts exactly
+ * once when it means something.
+ *
+ * An Ed25519 private key is 32 uniformly random bytes, so the seed comes
  * straight from `expo-crypto`'s CSPRNG with no RNG polyfill involved.
  */
 
 import * as ed from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
 import * as Crypto from "expo-crypto";
+import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
 import {
@@ -32,6 +46,13 @@ ed.hashes.sha512Async = async (message: Uint8Array) => sha512(message);
 
 const KEY_PREFIX = "wolunlock.seed.";
 
+/**
+ * How a seed is stored in the keychain.
+ *
+ * `"device-only"` is what everything uses now. `"biometric"` only appears on
+ * records paired before the gate moved, and is migrated away on first use by
+ * {@link migrateToDeviceOnly}.
+ */
 export type KeyStorageMode = "biometric" | "device-only";
 
 export type DeviceKey = {
@@ -53,32 +74,8 @@ function optionsFor(mode: KeyStorageMode, prompt: string): SecureStore.SecureSto
   };
 }
 
-/**
- * Whether the keychain can hold a biometry-protected item on this device.
- *
- * False when no passcode or biometric is enrolled. Storing with
- * `requireAuthentication` would then fail at write time, so this is checked up
- * front and the caller falls back to device-only protection.
- */
-export async function canUseBiometricStorage(): Promise<boolean> {
-  try {
-    return await SecureStore.canUseBiometricAuthentication();
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Generate a keypair and persist the seed.
- *
- * Returns the public half plus the storage mode actually achieved, which the
- * caller records on the PC so the UI can tell the user whether Face ID guards
- * the unlock action.
- */
-export async function createDeviceKey(
-  alias: string,
-  preferred: KeyStorageMode = "biometric",
-): Promise<DeviceKey & { mode: KeyStorageMode }> {
+/** Generate a keypair and persist the seed. */
+export async function createDeviceKey(alias: string): Promise<DeviceKey> {
   const seed = Crypto.getRandomBytes(SEED_BYTES);
   if (seed.length !== SEED_BYTES) {
     throw new Error("the platform CSPRNG returned the wrong number of bytes");
@@ -89,25 +86,11 @@ export async function createDeviceKey(
     throw new Error("derived public key has the wrong length");
   }
 
-  let mode: KeyStorageMode = preferred;
-  if (mode === "biometric" && !(await canUseBiometricStorage())) {
-    mode = "device-only";
-  }
-
-  const value = b64uEncode(seed);
-  try {
-    await SecureStore.setItemAsync(
-      storageKey(alias),
-      value,
-      optionsFor(mode, "Protect the key that unlocks your PC"),
-    );
-  } catch (error) {
-    if (mode !== "biometric") throw error;
-    // Biometric enrollment can change between the check above and the write.
-    mode = "device-only";
-    await SecureStore.setItemAsync(storageKey(alias), value, optionsFor(mode, ""));
-  }
-
+  await SecureStore.setItemAsync(
+    storageKey(alias),
+    b64uEncode(seed),
+    optionsFor("device-only", ""),
+  );
   seed.fill(0);
 
   return {
@@ -115,28 +98,21 @@ export async function createDeviceKey(
     publicKeyB64: b64uEncode(publicKey),
     deviceId: deviceIdFor(publicKey),
     fingerprint: fingerprint(publicKey),
-    mode,
   };
 }
 
-/**
- * Sign a message with a stored key.
- *
- * When the key was stored with biometric protection, reading it triggers the
- * Face ID prompt -- which is exactly the gate we want in front of unlocking a
- * PC, and the reason the seed is fetched per signature rather than cached.
- */
+/** Sign a message. Never prompts: the biometric gate is on the action. */
 export async function signWithDeviceKey(
   alias: string,
   message: Uint8Array,
-  mode: KeyStorageMode,
-  prompt = "Unlock your PC",
+  mode: KeyStorageMode = "device-only",
 ): Promise<Uint8Array> {
-  const stored = await SecureStore.getItemAsync(storageKey(alias), optionsFor(mode, prompt));
+  const stored = await SecureStore.getItemAsync(
+    storageKey(alias),
+    optionsFor(mode, "Confirm it's you"),
+  );
   if (!stored) {
-    throw new Error(
-      "This device's key is missing from the keychain. Pair with the PC again.",
-    );
+    throw new Error("This device's key is missing from the keychain. Pair with the PC again.");
   }
 
   const seed = b64uDecode(stored, SEED_BYTES);
@@ -147,24 +123,52 @@ export async function signWithDeviceKey(
   }
 }
 
-export async function getPublicKey(
-  alias: string,
-  mode: KeyStorageMode,
-  prompt = "Confirm it's you",
-): Promise<Uint8Array> {
-  const stored = await SecureStore.getItemAsync(storageKey(alias), optionsFor(mode, prompt));
-  if (!stored) throw new Error("key not found");
-  const seed = b64uDecode(stored, SEED_BYTES);
+/**
+ * Rewrite a legacy biometry-protected seed as device-only.
+ *
+ * Costs one Face ID prompt — the last one that record will ever cause — and
+ * saves the user from having to re-pair. Returns false if the read failed, in
+ * which case the caller should leave the stored mode alone and try again later.
+ */
+export async function migrateToDeviceOnly(alias: string): Promise<boolean> {
   try {
-    return ed.getPublicKey(seed);
-  } finally {
-    seed.fill(0);
+    const stored = await SecureStore.getItemAsync(
+      storageKey(alias),
+      optionsFor("biometric", "Update how this key is stored"),
+    );
+    if (!stored) return false;
+    await SecureStore.setItemAsync(storageKey(alias), stored, optionsFor("device-only", ""));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ask for Face ID / Touch ID / passcode before a sensitive action.
+ *
+ * Returns true when the device has no biometric hardware or nothing enrolled:
+ * refusing outright would make the app unusable on such a device, and the
+ * seed is already gated behind the phone's own lock screen.
+ */
+export async function confirmBiometrics(reason: string): Promise<boolean> {
+  try {
+    if (!(await LocalAuthentication.hasHardwareAsync())) return true;
+    if (!(await LocalAuthentication.isEnrolledAsync())) return true;
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: reason,
+      // Let the device passcode stand in when a face is not recognised.
+      disableDeviceFallback: false,
+      cancelLabel: "Cancel",
+    });
+    return result.success;
+  } catch {
+    return false;
   }
 }
 
 export async function deleteDeviceKey(alias: string): Promise<void> {
-  // No options: deletion must succeed even if biometry is unavailable, or a
-  // revoked PC would leave its key stranded in the keychain forever.
   try {
     await SecureStore.deleteItemAsync(storageKey(alias));
   } catch {
@@ -172,8 +176,10 @@ export async function deleteDeviceKey(alias: string): Promise<void> {
   }
 }
 
-/** A fresh key alias. Random rather than derived, so re-pairing the same PC
- * never collides with a key that is still being deleted. */
+/**
+ * A fresh key alias. Random rather than derived, so re-pairing the same PC
+ * never collides with a key that is still being deleted.
+ */
 export function newKeyAlias(): string {
   return b64uEncode(Crypto.getRandomBytes(12));
 }
