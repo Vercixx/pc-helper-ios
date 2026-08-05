@@ -136,6 +136,33 @@ silent: `addAppGroup` can be refused for the team, which SideStore logs as
 end up naming a group it holds no container for, which `publish` now reports as
 a failed write instead of returning success for a write that went nowhere.
 
+### Install over an existing copy and the extension disappears
+
+An App Group that works is not enough — the `.appex` also has to survive the
+install. SideStore's `RemoveAppExtensionsOperation` deletes any extension it
+considers *excess*, and excess is computed against **what the installed copy
+already has**:
+
+```swift
+let excessExtensionsInTargetApp = targetAppEx.filter {
+    !(existingAppExNames.contains($0.bundleIdentifier))
+}
+```
+
+Updating an install that had no widget therefore removes the widget, because it
+is new. Normally that is a prompt — an "App Contains Extensions" alert offering
+*Use Main Profile*, *Register App ID for Each Extension*, *Remove*, or *Choose* —
+but the prompt needs `customizeAppExtensions` (on by default for a free team,
+under Settings → Advanced → User Customizations) **and** SideStore in the
+foreground with a live view controller. Without both it takes the silent path
+and removes the extension with no trace. The app installs, the App Group works,
+the widget storage row reads "ok", and the widget is absent from Add Widget.
+
+A fresh install has nothing to compare against — `localAppExtensions == nil`
+short-circuits to keeping everything. **So: delete the app first, then install
+with SideStore in the foreground.** Keeping the extension costs a second App ID
+against the free account's ten per week, unless *Use Main Profile* is chosen.
+
 ## Known limits
 
 - **One PC.** The widget acts on the first paired PC. Choosing between several
