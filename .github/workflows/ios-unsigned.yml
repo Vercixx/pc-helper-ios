@@ -30,7 +30,9 @@ jobs:
   build:
     # Pinned rather than macos-latest: a runner image bump that changes the
     # bundled Xcode should be a deliberate choice, not a surprise broken build.
-    runs-on: macos-15
+    # macos-15 ships Xcode 16.4, whose SwiftPM cannot resolve the package graph
+    # Expo SDK 57 / React Native 0.86 generate for ExpoModulesJSI.
+    runs-on: macos-26
     timeout-minutes: 45
     defaults:
       run:
@@ -38,6 +40,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select the newest installed Xcode
+        # Logged unconditionally: when a build breaks in Expo's or React
+        # Native's native tooling, the toolchain version is the first thing
+        # worth knowing, and the default is not always the newest present.
+        run: |
+          ls -d /Applications/Xcode*.app
+          newest="$(ls -d /Applications/Xcode*.app | sort -V | tail -n1)"
+          echo "Selecting $newest"
+          sudo xcode-select -s "$newest/Contents/Developer"
+          xcodebuild -version
+          swift --version
 
       - uses: actions/setup-node@v4
         with:
