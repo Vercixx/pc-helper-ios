@@ -14,7 +14,13 @@ import {
   View,
 } from "react-native";
 
-import { appGroups, bundleIdentifier, sharedAppGroup } from "@modules/app-group";
+import {
+  appGroups,
+  bundleIdentifier,
+  entitlementKeys,
+  hasProvisioningProfile,
+  sharedAppGroup,
+} from "@modules/app-group";
 
 import { usePCActions } from "@/actions/usePCActions";
 import { usePCStore } from "@/state/store";
@@ -193,14 +199,28 @@ function Detail({ label, value, mono }: { label: string; value: string; mono?: b
   );
 }
 
-/** One line saying whether shared storage is live, and under which identifier. */
+/**
+ * Whether shared storage is live, and if not, why not.
+ *
+ * "No App Group" alone is ambiguous: the profile may genuinely lack one, or it
+ * may never have been read. Printing the entitlement keys settles it -- keys
+ * present means the profile parsed and the group really was stripped, which is
+ * a signing-side fact no code change can undo.
+ */
 function widgetStorageSummary(): string {
   const granted = appGroups();
-  if (granted.length === 0) {
-    return `no App Group granted\n${bundleIdentifier() ?? "?"}`;
+  if (granted.length > 0) {
+    const chosen = sharedAppGroup() ?? granted[0]!;
+    return `${isWidgetStorageWorking() ? "ok" : "not writable"}\n${chosen}`;
   }
-  const chosen = sharedAppGroup() ?? granted[0]!;
-  return `${isWidgetStorageWorking() ? "ok" : "not writable"}\n${chosen}`;
+
+  const keys = entitlementKeys();
+  if (keys.length > 0) {
+    return `no App Group in the signed profile\nprofile grants: ${keys.join(", ")}`;
+  }
+  return hasProvisioningProfile()
+    ? `profile present but unreadable\n${bundleIdentifier() ?? "?"}`
+    : `no provisioning profile\n${bundleIdentifier() ?? "?"}`;
 }
 
 function dotColor(reachable: boolean | undefined, locked: boolean | null | undefined): string {

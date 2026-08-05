@@ -36,9 +36,28 @@ enum ProvisioningEntitlements {
 
   /// Prefers a group that looks like ours, so a tool that adds its own group
   /// for bookkeeping does not win the pick.
+  ///
+  /// Returns "" rather than the compile-time fallback when nothing was granted:
+  /// callers need "there is no container" to be distinguishable from "here is a
+  /// container", and handing back an identifier this build does not hold makes
+  /// every write fail in a way that looks like a different bug.
   static func sharedAppGroup(in bundle: Bundle = .main) -> String {
     let groups = appGroups(in: bundle)
-    return groups.first { $0.contains("wolunlock") } ?? groups.first ?? fallbackAppGroup
+    return groups.first { $0.contains("wolunlock") } ?? groups.first ?? ""
+  }
+
+  /// Which entitlements the profile actually carries.
+  ///
+  /// The one question the previous diagnostic could not answer: an empty group
+  /// list means either that the profile was stripped of app groups or that it
+  /// was never read. Keys present means it was read.
+  static func entitlementKeys(in bundle: Bundle = .main) -> [String] {
+    guard let entitlements = read(in: bundle) else { return [] }
+    return entitlements.keys.sorted()
+  }
+
+  static func hasProfile(in bundle: Bundle = .main) -> Bool {
+    bundle.url(forResource: "embedded", withExtension: "mobileprovision") != nil
   }
 
   static func read(in bundle: Bundle) -> [String: Any]? {
@@ -86,6 +105,15 @@ public final class AppGroupModule: Module {
 
     Function("bundleIdentifier") { () -> String in
       Bundle.main.bundleIdentifier ?? ""
+    }
+
+    // Distinguishes "no groups in the profile" from "no profile read at all".
+    Function("entitlementKeys") { () -> [String] in
+      ProvisioningEntitlements.entitlementKeys()
+    }
+
+    Function("hasProvisioningProfile") { () -> Bool in
+      ProvisioningEntitlements.hasProfile()
     }
 
     // Writing and reloading happen here, against one discovered identifier, so

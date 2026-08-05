@@ -56,7 +56,6 @@
         }
       ],
       "expo-local-authentication",
-      "@bacons/apple-targets",
       "./plugins/withAppIntents"
     ],
     "experiments": {

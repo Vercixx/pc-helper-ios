@@ -17,7 +17,8 @@ iPhone (Expo / SwiftUI)                      my-pc (systemd --user)
 | **PC service** | [`pc-service/`](pc-service/) — Python 3.11+, aiohttp, zeroconf |
 | **iOS app** | [`mobile/`](mobile/) — Expo SDK 57, `@expo/ui` SwiftUI |
 | **Installing on a phone** | [`docs/SIDELOADING.md`](docs/SIDELOADING.md) — including the free-account route |
-| **Widgets & Control Center** | [`docs/WIDGETS.md`](docs/WIDGETS.md) — what they can do, and why not unlock |
+| **Shortcuts & Siri** | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) — Wake / status / unlock as App Intents |
+| **Widgets** | [`docs/WIDGETS.md`](docs/WIDGETS.md) — built, then shelved: no App Group on a sideloaded build |
 
 ---
 

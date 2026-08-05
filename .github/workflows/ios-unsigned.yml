@@ -130,14 +130,16 @@ jobs:
           app="$(ls -d build/Build/Products/Release-iphoneos/*.app | head -n1)"
           echo "Packaging $app"
 
-          # A missing extension is invisible until the widget gallery on the
-          # phone turns up empty, which is a miserable thing to debug remotely.
-          if ! ls "$app"/PlugIns/*.appex >/dev/null 2>&1; then
-            echo "::error::no .appex under PlugIns — the widget target did not build or embed"
-            exit 1
+          # Reported, not enforced. The widget target is currently switched off
+          # (see docs/WIDGETS.md), so no extension is the expected state -- but
+          # when it is switched back on, a silently missing .appex looks exactly
+          # like "widgets don't work" on the phone, so it is worth printing.
+          if ls "$app"/PlugIns/*.appex >/dev/null 2>&1; then
+            echo "Embedded extensions:"
+            ls -d "$app"/PlugIns/*.appex
+          else
+            echo "No app extensions embedded (widget target disabled)."
           fi
-          echo "Embedded extensions:"
-          ls -d "$app"/PlugIns/*.appex
 
           rm -rf Payload
           mkdir -p Payload

@@ -1,5 +1,14 @@
 # Widgets and Control Center
 
+> **Status: the widget target is not built.** SideStore's signing does not grant
+> this app an App Group, and without one an extension cannot see any of the app's
+> data. The code is kept in `mobile/targets/widget/` and comes back by adding
+> `"@bacons/apple-targets"` to `plugins` in `mobile/app.json`.
+>
+> The same three actions are available through **Shortcuts** instead, as App
+> Intents in the app target — see [SHORTCUTS.md](SHORTCUTS.md). Those need no
+> entitlement at all and do work.
+
 A WidgetKit extension (`mobile/targets/widget`) that shows whether the PC is
 awake and locked, and can wake it — from the Home Screen, the Lock Screen, and
 Control Center.

@@ -21,6 +21,10 @@ declare class AppGroupNativeModule extends NativeModule {
   sharedAppGroup(): string;
   /** The bundle identifier as installed, which may not be the one in app.json. */
   bundleIdentifier(): string;
+  /** Entitlement keys the profile carries. Empty means it was not read. */
+  entitlementKeys(): string[];
+  /** Whether the bundle contains an `embedded.mobileprovision` at all. */
+  hasProvisioningProfile(): boolean;
   /** Write shared state and reload widgets. False if there is no container. */
   publish(json: string): boolean;
 }
@@ -67,6 +71,29 @@ export function sharedAppGroup(): string | null {
     return value && value.length > 0 ? value : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * What the signed profile actually granted.
+ *
+ * Empty while {@link hasProvisioningProfile} is true means the profile exists
+ * but could not be parsed; empty with no profile means an unsigned or simulator
+ * build.
+ */
+export function entitlementKeys(): string[] {
+  try {
+    return nativeModule()?.entitlementKeys() ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function hasProvisioningProfile(): boolean {
+  try {
+    return nativeModule()?.hasProvisioningProfile() ?? false;
+  } catch {
+    return false;
   }
 }
 
