@@ -100,13 +100,13 @@ struct PCTimelineProvider: TimelineProvider {
 
 // MARK: - Presentation
 
-private func symbol(reachable: Bool, locked: Bool?) -> String {
+private func statusSymbol(reachable: Bool, locked: Bool?) -> String {
   guard reachable else { return "moon.zzz.fill" }
   guard let locked else { return "desktopcomputer" }
   return locked ? "lock.fill" : "lock.open.fill"
 }
 
-private func tint(reachable: Bool, locked: Bool?) -> Color {
+private func statusColor(reachable: Bool, locked: Bool?) -> Color {
   guard reachable else { return .secondary }
   guard let locked else { return .green }
   return locked ? .orange : .green
@@ -140,13 +140,13 @@ struct StatusWidgetView: View {
   var body: some View {
     switch family {
     case .accessoryCircular:
-      Image(systemName: symbol(reachable: entry.reachable, locked: entry.locked))
+      Image(systemName: statusSymbol(reachable: entry.reachable, locked: entry.locked))
         .font(.title2)
         .widgetAccentable()
     case .accessoryRectangular:
       VStack(alignment: .leading, spacing: 2) {
         Text(entry.pc?.name ?? "PC Unlock").font(.headline).lineLimit(1)
-        Label(headline(entry), systemImage: symbol(reachable: entry.reachable, locked: entry.locked))
+        Label(headline(entry), systemImage: statusSymbol(reachable: entry.reachable, locked: entry.locked))
           .font(.caption)
           .lineLimit(1)
       }
@@ -158,9 +158,9 @@ struct StatusWidgetView: View {
   private var systemView: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
-        Image(systemName: symbol(reachable: entry.reachable, locked: entry.locked))
+        Image(systemName: statusSymbol(reachable: entry.reachable, locked: entry.locked))
           .font(.title3)
-          .foregroundStyle(tint(reachable: entry.reachable, locked: entry.locked))
+          .foregroundStyle(statusColor(reachable: entry.reachable, locked: entry.locked))
         Text(entry.pc?.name ?? "PC Unlock")
           .font(.headline)
           .lineLimit(1)
