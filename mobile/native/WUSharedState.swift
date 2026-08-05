@@ -96,7 +96,8 @@ enum SharedState {
        let payload = decode(data) {
       return payload
     }
-    if let defaults = UserDefaults(suiteName: appGroup),
+    if Entitlements.hasContainer(appGroup),
+       let defaults = UserDefaults(suiteName: appGroup),
        let raw = defaults.string(forKey: stateKey),
        let data = raw.data(using: .utf8),
        let payload = decode(data) {

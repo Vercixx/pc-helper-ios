@@ -1,11 +1,13 @@
 # Widgets and Control Center
 
-> **Status: the widget target is not built.** SideStore's signing does not grant
-> this app an App Group, and without one an extension cannot see any of the app's
-> data. The code is kept in `mobile/targets/widget/` and comes back by adding
-> `"@bacons/apple-targets"` to `plugins` in `mobile/app.json`.
+> **Status: the target builds again, and is unverified on device.** The earlier
+> conclusion — that SideStore does not grant this app an App Group — was a
+> symptom, not the cause: the CI build was unsigned, so the entitlement was not
+> in the binaries for SideStore to find. See [Sideloading](#sideloading) below.
+> Whether the group survives a real install is now a question one sideload
+> answers.
 >
-> The same three actions are available through **Shortcuts** instead, as App
+> The same three actions are available through **Shortcuts** regardless, as App
 > Intents in the app target — see [SHORTCUTS.md](SHORTCUTS.md). Those need no
 > entitlement at all and do work.
 
@@ -106,17 +108,33 @@ with widgets simply showing cached data.
 ### Sideloading
 
 App Groups are one of the capabilities Apple restricts to paid Developer Program
-memberships; a free Personal Team cannot provision them through Xcode. Some
-sideloading tools (SideStore among them) rewrite app group identifiers during
-signing so that group-dependent features still work.
+memberships; a free Personal Team cannot provision them through Xcode. The
+AltStore family (SideStore among them) works around this during signing: it
+registers the group under its own team, renaming it to
+`group.com.vercixx.wolunlock.<TEAMID>`, and rewrites the entitlement to match.
+That rename is why nothing may hardcode the identifier — see
+`WUEntitlements.swift`.
 
-Because the CI build is unsigned, nothing is embedded in the binaries. The
-build artifact therefore includes an `entitlements/` folder next to the `.ipa`
-so a signing tool that does not infer the group from the bundle can be handed
-it explicitly.
+**The entitlement has to be in the binary for any of that to happen.** SideStore
+discovers what an app needs by reading the entitlements out of each Mach-O's
+code signature — AltSign's `ALTApplication` calls `ldid::Entitlements` — and
+never reads an entitlements file shipped beside the `.ipa`. An unsigned build
+carries no such blob, so the installer concludes the app uses no App Groups,
+turns the feature off on the App ID, registers no group, and issues a profile
+without one. The app and the widget are then signed into separate sandboxes
+with no shared container, silently, and the widget shows "Not paired" forever.
 
-If the App Group does not survive signing, the widget shows "Not paired" and the
-app is otherwise unaffected.
+`.github/workflows/ios-unsigned.yml` therefore ad-hoc signs each bundle with its
+entitlements after building — extensions before the app, as codesign requires —
+purely so the installer can read them; the ad-hoc signature is replaced at
+install time. A following step fails the build if
+`com.apple.security.application-groups` is missing from any bundle's signature.
+
+Two things can still go wrong on the phone, and both are visible rather than
+silent: `addAppGroup` can be refused for the team, which SideStore logs as
+`Failed to create new App Group` and then continues without one; and the app can
+end up naming a group it holds no container for, which `publish` now reports as
+a failed write instead of returning success for a write that went nowhere.
 
 ## Known limits
 

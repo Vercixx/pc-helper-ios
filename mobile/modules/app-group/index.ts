@@ -5,10 +5,12 @@
  * them unique — SideStore appends the team ID, so `com.vercixx.wolunlock`
  * becomes `com.vercixx.wolunlock.QMNZ42…` and the App Group is rewritten to
  * match. Anything that hardcodes `group.com.vercixx.wolunlock` then addresses a
- * container that does not exist, which is silent: `UserDefaults(suiteName:)`
- * returns nil and the keychain simply refuses the access group.
+ * container that does not exist, and does so silently: naming a group you are
+ * not entitled to still yields a working-looking `UserDefaults`, whose writes
+ * are discarded, and the keychain simply refuses the access group.
  *
- * The native side reads the real values out of `embedded.mobileprovision`.
+ * The native side reads the real values out of `embedded.mobileprovision`, and
+ * proves a container exists before reporting a write as published.
  */
 
 import { NativeModule, requireNativeModule } from "expo";

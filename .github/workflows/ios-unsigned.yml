@@ -124,6 +124,85 @@ jobs:
           tail -200 "$RUNNER_TEMP/xcodebuild.log" || true
           echo "::endgroup::"
 
+      - name: Embed entitlements into the binaries
+        # The build is unsigned, which loses the App Group unless this step puts
+        # it back.
+        #
+        # SideStore and AltStore read an app's entitlements out of the Mach-O
+        # code signature -- AltSign's ALTApplication calls `ldid::Entitlements`
+        # on each binary -- and nothing in that pipeline ever reads an
+        # entitlements file shipped alongside the .ipa. With signing disabled
+        # there is no entitlements blob to read, so the installer concludes the
+        # app uses no App Groups, sets the feature off on the App ID, registers
+        # no group, and issues a profile without one. It then signs every bundle
+        # with that profile's entitlements. The app and the widget end up in
+        # separate sandboxes with no shared container, silently.
+        #
+        # The ad-hoc signature applied here is only a carrier. The installer
+        # replaces it with its own certificate; it just has to be able to read
+        # the entitlements first. Nested code is signed before the bundle that
+        # embeds it, which is the order codesign requires.
+        run: |
+          set -euo pipefail
+          app="$(ls -d build/Build/Products/Release-iphoneos/*.app | head -n1)"
+
+          # `expo prebuild` writes the app's entitlements next to its
+          # Info.plist; @bacons/apple-targets writes each extension's to
+          # ios/.targets/<product name>/generated.entitlements.
+          entitlements_for() {
+            for candidate in \
+              "ios/.targets/$1/generated.entitlements" \
+              "ios/$1/$1.entitlements"; do
+              if [ -f "$candidate" ]; then echo "$candidate"; return 0; fi
+            done
+            return 1
+          }
+
+          sign_bundle() {
+            name="$(basename "$1")"
+            name="${name%.*}"
+            if ! ent="$(entitlements_for "$name")"; then
+              echo "::error::no entitlements file found for $name"
+              exit 1
+            fi
+            echo "Signing $name with $ent"
+            codesign --force --sign - --entitlements "$ent" "$1"
+          }
+
+          # Frameworks carry no entitlements of their own, but a bundle cannot
+          # be signed while the code nested inside it is unsigned. -depth signs
+          # the innermost first.
+          while IFS= read -r nested; do
+            codesign --force --sign - "$nested"
+          done < <(find "$app" -depth \( -name "*.framework" -o -name "*.dylib" \))
+
+          for ext in "$app"/PlugIns/*.appex; do
+            [ -d "$ext" ] || continue
+            sign_bundle "$ext"
+          done
+          sign_bundle "$app"
+
+      - name: Verify the App Group survived into every bundle
+        # Losing it here is invisible on the phone -- the widget just renders
+        # "Not paired" forever -- so it is worth failing the build over.
+        run: |
+          set -uo pipefail
+          app="$(ls -d build/Build/Products/Release-iphoneos/*.app | head -n1)"
+          status=0
+          for bundle in "$app" "$app"/PlugIns/*.appex; do
+            [ -d "$bundle" ] || continue
+            name="$(basename "$bundle")"
+            echo "::group::$name entitlements"
+            embedded="$(codesign -d --entitlements :- "$bundle" 2>/dev/null || true)"
+            echo "$embedded"
+            echo "::endgroup::"
+            if ! printf '%s' "$embedded" | grep -aq "application-groups"; then
+              echo "::error::$name carries no App Group; a sideload of this build cannot share data"
+              status=1
+            fi
+          done
+          exit "$status"
+
       - name: Package as .ipa
         # An .ipa is just a zip with the .app inside a top-level Payload/ folder.
         run: |
@@ -162,10 +241,11 @@ jobs:
           fi
 
       - name: Collect entitlements for signing
-        # The build is unsigned, so nothing is embedded in the binaries. A
-        # signing tool that does not infer the App Group from the bundle needs
-        # to be handed these; without the group the widget reads an empty
-        # container and renders "Not paired" forever.
+        # The binaries now carry these themselves, which is what the
+        # AltStore-family installers actually read. Kept as an artifact for
+        # signing tools that instead take an entitlements plist as an argument
+        # (Sideloadly), and because seeing what was requested is useful when
+        # comparing against what a profile came back with.
         run: |
           mkdir -p entitlements
           find ios -name "*.entitlements" -print -exec sh -c \

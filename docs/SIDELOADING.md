@@ -27,8 +27,15 @@ on `v*` tags rather than on every push, because macOS runners bill at a 10×
 minute multiplier on private repositories. They are free on public ones.
 
 The workflow typechecks, runs both test suites, generates the native project,
-builds with signing disabled, verifies the binary is device- and not
-simulator-architecture, and uploads `wol-unlock-unsigned.ipa` as an artifact.
+builds with signing disabled, embeds each bundle's entitlements with an ad-hoc
+signature, verifies the App Group is present in every bundle and that the binary
+is device- and not simulator-architecture, then uploads
+`wol-unlock-unsigned.ipa` as an artifact.
+
+The ad-hoc step is not optional. Signing tools read what an app needs out of its
+code signature, so an entitlement absent from the binary is an entitlement the
+signer will not ask Apple for — which is how the widget lost its App Group.
+See [WIDGETS.md](WIDGETS.md#sideloading).
 
 To build it on a Mac instead:
 
@@ -39,7 +46,19 @@ npx expo prebuild --platform ios --clean
 xcodebuild -workspace ios/*.xcworkspace -scheme "$(basename ios/*.xcworkspace .xcworkspace)" \
   -configuration Release -sdk iphoneos -derivedDataPath build \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
-mkdir -p Payload && cp -R build/Build/Products/Release-iphoneos/*.app Payload/
+
+app="$(ls -d build/Build/Products/Release-iphoneos/*.app | head -n1)"
+# Nested code first, then extensions, then the app.
+find "$app" -depth \( -name "*.framework" -o -name "*.dylib" \) \
+  -exec codesign --force --sign - {} \;
+for ext in "$app"/PlugIns/*.appex; do
+  name="$(basename "$ext" .appex)"
+  codesign --force --sign - --entitlements "ios/.targets/$name/generated.entitlements" "$ext"
+done
+codesign --force --sign - --entitlements ios/PCUnlock/PCUnlock.entitlements "$app"
+codesign -d --entitlements :- "$app"   # should list application-groups
+
+mkdir -p Payload && cp -R "$app" Payload/
 zip -qry wol-unlock-unsigned.ipa Payload && rm -rf Payload
 ```
 

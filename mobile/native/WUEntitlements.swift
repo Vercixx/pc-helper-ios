@@ -53,6 +53,19 @@ enum Entitlements {
     return groups.first ?? fallbackAppGroup
   }
 
+  /// Whether a shared container for `group` actually exists for this process.
+  ///
+  /// The obvious test -- `UserDefaults(suiteName:)` returning non-nil -- is not
+  /// one. That initialiser returns nil only for the main bundle identifier or a
+  /// global domain; for a group this process is not entitled to, and for "", it
+  /// hands back a live object whose writes cfprefsd quietly discards. Asking the
+  /// file system for the container is the check that can actually fail.
+  static func hasContainer(_ group: String) -> Bool {
+    guard !group.isEmpty else { return false }
+    return FileManager.default
+      .containerURL(forSecurityApplicationGroupIdentifier: group) != nil
+  }
+
   /// Keychain access groups, which are subject to the same rewriting.
   static func keychainAccessGroups(in bundle: Bundle = .main) -> [String] {
     guard let entitlements = provisioningEntitlements(in: bundle),

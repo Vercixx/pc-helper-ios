@@ -18,7 +18,7 @@ iPhone (Expo / SwiftUI)                      my-pc (systemd --user)
 | **iOS app** | [`mobile/`](mobile/) — Expo SDK 57, `@expo/ui` SwiftUI |
 | **Installing on a phone** | [`docs/SIDELOADING.md`](docs/SIDELOADING.md) — including the free-account route |
 | **Shortcuts & Siri** | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) — Wake / status / unlock as App Intents |
-| **Widgets** | [`docs/WIDGETS.md`](docs/WIDGETS.md) — built, then shelved: no App Group on a sideloaded build |
+| **Widgets** | [`docs/WIDGETS.md`](docs/WIDGETS.md) — WidgetKit and Control Center, pending an App Group that survives a sideload |
 
 ---
 

@@ -73,7 +73,8 @@ enum SharedState {
   /// entitlement is missing, or the payload is from a newer app than this
   /// extension understands.
   static func load() -> Payload? {
-    guard let defaults = UserDefaults(suiteName: appGroup),
+    guard Entitlements.hasContainer(appGroup),
+          let defaults = UserDefaults(suiteName: appGroup),
           let raw = defaults.string(forKey: stateKey),
           let data = raw.data(using: .utf8),
           let payload = try? JSONDecoder().decode(Payload.self, from: data),

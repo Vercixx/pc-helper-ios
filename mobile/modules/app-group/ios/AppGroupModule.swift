@@ -60,6 +60,19 @@ enum ProvisioningEntitlements {
     bundle.url(forResource: "embedded", withExtension: "mobileprovision") != nil
   }
 
+  /// Whether a shared container for `group` actually exists for this process.
+  ///
+  /// The obvious test -- `UserDefaults(suiteName:)` returning non-nil -- is not
+  /// one. That initialiser returns nil only for the main bundle identifier or a
+  /// global domain; for a group this process is not entitled to, and for "", it
+  /// hands back a live object whose writes cfprefsd quietly discards. Asking the
+  /// file system for the container is the check that can actually fail.
+  static func hasContainer(_ group: String) -> Bool {
+    guard !group.isEmpty else { return false }
+    return FileManager.default
+      .containerURL(forSecurityApplicationGroupIdentifier: group) != nil
+  }
+
   static func read(in bundle: Bundle) -> [String: Any]? {
     guard let url = bundle.url(forResource: "embedded", withExtension: "mobileprovision"),
           let data = try? Data(contentsOf: url),
@@ -122,7 +135,9 @@ public final class AppGroupModule: Module {
     // "silently went nowhere".
     Function("publish") { (json: String) -> Bool in
       let group = ProvisioningEntitlements.sharedAppGroup()
-      guard let defaults = UserDefaults(suiteName: group) else { return false }
+      guard ProvisioningEntitlements.hasContainer(group),
+            let defaults = UserDefaults(suiteName: group)
+      else { return false }
       defaults.set(json, forKey: "wolunlock.state")
       WidgetCenter.shared.reloadAllTimelines()
       if #available(iOS 18.0, *) {
