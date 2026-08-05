@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Committed deliberately. The config plugin writes a default Info.plist only
+  when one is absent, so this file survives `expo prebuild` and is the only
+  place the extension's ATS and local-network declarations can live.
+
+  App Transport Security is evaluated per process. The containing app's
+  exemption does not extend to the extension, so without NSAllowsLocalNetworking
+  here every request to http://<pc>.local:8765 fails inside the widget while the
+  identical request succeeds in the app.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PC Unlock checks whether your computer is awake and sends it wake commands.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_wol-unlock._tcp</string>
+	</array>
+</dict>
+</plist>

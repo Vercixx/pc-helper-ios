@@ -129,6 +129,16 @@ jobs:
         run: |
           app="$(ls -d build/Build/Products/Release-iphoneos/*.app | head -n1)"
           echo "Packaging $app"
+
+          # A missing extension is invisible until the widget gallery on the
+          # phone turns up empty, which is a miserable thing to debug remotely.
+          if ! ls "$app"/PlugIns/*.appex >/dev/null 2>&1; then
+            echo "::error::no .appex under PlugIns — the widget target did not build or embed"
+            exit 1
+          fi
+          echo "Embedded extensions:"
+          ls -d "$app"/PlugIns/*.appex
+
           rm -rf Payload
           mkdir -p Payload
           cp -R "$app" Payload/
@@ -140,8 +150,8 @@ jobs:
         # A simulator build would upload fine and then fail to install on the
         # phone, so fail loudly here instead.
         run: |
-          binary="$(find build/Build/Products/Release-iphoneos -maxdepth 2 -type f -perm +111 \
-            -not -name "*.dylib" | head -n1)"
+          app="$(ls -d build/Build/Products/Release-iphoneos/*.app | head -n1)"
+          binary="$app/$(basename "$app" .app)"
           echo "Inspecting $binary"
           lipo -info "$binary"
           if lipo -info "$binary" | grep -qi "x86_64"; then
@@ -149,9 +159,22 @@ jobs:
             exit 1
           fi
 
+      - name: Collect entitlements for signing
+        # The build is unsigned, so nothing is embedded in the binaries. A
+        # signing tool that does not infer the App Group from the bundle needs
+        # to be handed these; without the group the widget reads an empty
+        # container and renders "Not paired" forever.
+        run: |
+          mkdir -p entitlements
+          find ios -name "*.entitlements" -print -exec sh -c \
+            'cp "$1" "entitlements/$(basename "$(dirname "$1")")-$(basename "$1")"' _ {} \;
+          ls -l entitlements
+
       - uses: actions/upload-artifact@v4
         with:
           name: wol-unlock-unsigned-ipa
-          path: mobile/wol-unlock-unsigned.ipa
+          path: |
+            mobile/wol-unlock-unsigned.ipa
+            mobile/entitlements
           retention-days: 14
           if-no-files-found: error

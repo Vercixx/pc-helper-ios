@@ -47,6 +47,20 @@ ed.hashes.sha512Async = async (message: Uint8Array) => sha512(message);
 const KEY_PREFIX = "wolunlock.seed.";
 
 /**
+ * Keychain access group shared with the widget extension.
+ *
+ * An App Group identifier is a legal keychain access group, and it is the right
+ * one to use here: unlike `$(AppIdentifierPrefix)com.vercixx.wolunlock` it is a
+ * literal the extension can name at compile time without knowing the team
+ * prefix it was signed with.
+ *
+ * Every write falls back to the app-private default if this is refused, which is
+ * what happens when the entitlement did not survive signing. The app then works
+ * exactly as before and only the widget's live status is lost.
+ */
+const SHARED_ACCESS_GROUP = "group.com.vercixx.wolunlock";
+
+/**
  * How a seed is stored in the keychain.
  *
  * `"device-only"` is what everything uses now. `"biometric"` only appears on
@@ -66,12 +80,78 @@ function storageKey(alias: string): string {
   return `${KEY_PREFIX}${alias}`;
 }
 
-function optionsFor(mode: KeyStorageMode, prompt: string): SecureStore.SecureStoreOptions {
+function optionsFor(
+  mode: KeyStorageMode,
+  prompt: string,
+  accessGroup?: string,
+): SecureStore.SecureStoreOptions {
   return {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     requireAuthentication: mode === "biometric",
     authenticationPrompt: prompt,
+    ...(accessGroup ? { accessGroup } : {}),
   };
+}
+
+/**
+ * Store a seed in the shared group, falling back to the app-private default.
+ *
+ * Returns which group the item ended up in, for callers that want to know
+ * whether the widget will be able to read it.
+ */
+async function writeSeed(
+  alias: string,
+  encodedSeed: string,
+  mode: KeyStorageMode,
+): Promise<"shared" | "private"> {
+  try {
+    await SecureStore.setItemAsync(
+      storageKey(alias),
+      encodedSeed,
+      optionsFor(mode, "", SHARED_ACCESS_GROUP),
+    );
+    return "shared";
+  } catch {
+    await SecureStore.setItemAsync(storageKey(alias), encodedSeed, optionsFor(mode, ""));
+    return "private";
+  }
+}
+
+/**
+ * Read a seed from wherever it is.
+ *
+ * Checks the shared group first, then the app-private default, and promotes a
+ * private item to the shared group when it finds one -- so a PC paired before
+ * the widget existed becomes visible to it without re-pairing.
+ */
+async function readSeed(
+  alias: string,
+  mode: KeyStorageMode,
+  prompt: string,
+): Promise<string | null> {
+  try {
+    const shared = await SecureStore.getItemAsync(
+      storageKey(alias),
+      optionsFor(mode, prompt, SHARED_ACCESS_GROUP),
+    );
+    if (shared) return shared;
+  } catch {
+    /* No entitlement for the shared group. Fall through to the private one. */
+  }
+
+  const priv = await SecureStore.getItemAsync(storageKey(alias), optionsFor(mode, prompt));
+  if (!priv) return null;
+
+  try {
+    await SecureStore.setItemAsync(
+      storageKey(alias),
+      priv,
+      optionsFor("device-only", "", SHARED_ACCESS_GROUP),
+    );
+  } catch {
+    /* Promotion is best-effort; the seed is still usable where it is. */
+  }
+  return priv;
 }
 
 /** Generate a keypair and persist the seed. */
@@ -86,11 +166,7 @@ export async function createDeviceKey(alias: string): Promise<DeviceKey> {
     throw new Error("derived public key has the wrong length");
   }
 
-  await SecureStore.setItemAsync(
-    storageKey(alias),
-    b64uEncode(seed),
-    optionsFor("device-only", ""),
-  );
+  await writeSeed(alias, b64uEncode(seed), "device-only");
   seed.fill(0);
 
   return {
@@ -107,10 +183,7 @@ export async function signWithDeviceKey(
   message: Uint8Array,
   mode: KeyStorageMode = "device-only",
 ): Promise<Uint8Array> {
-  const stored = await SecureStore.getItemAsync(
-    storageKey(alias),
-    optionsFor(mode, "Confirm it's you"),
-  );
+  const stored = await readSeed(alias, mode, "Confirm it's you");
   if (!stored) {
     throw new Error("This device's key is missing from the keychain. Pair with the PC again.");
   }
@@ -132,12 +205,9 @@ export async function signWithDeviceKey(
  */
 export async function migrateToDeviceOnly(alias: string): Promise<boolean> {
   try {
-    const stored = await SecureStore.getItemAsync(
-      storageKey(alias),
-      optionsFor("biometric", "Update how this key is stored"),
-    );
+    const stored = await readSeed(alias, "biometric", "Update how this key is stored");
     if (!stored) return false;
-    await SecureStore.setItemAsync(storageKey(alias), stored, optionsFor("device-only", ""));
+    await writeSeed(alias, stored, "device-only");
     return true;
   } catch {
     return false;
@@ -169,10 +239,17 @@ export async function confirmBiometrics(reason: string): Promise<boolean> {
 }
 
 export async function deleteDeviceKey(alias: string): Promise<void> {
-  try {
-    await SecureStore.deleteItemAsync(storageKey(alias));
-  } catch {
-    /* already gone */
+  // Both groups: a seed promoted to the shared group may have left the
+  // app-private copy behind, and unpairing must not leave a usable key anywhere.
+  for (const options of [
+    optionsFor("device-only", "", SHARED_ACCESS_GROUP),
+    optionsFor("device-only", ""),
+  ]) {
+    try {
+      await SecureStore.deleteItemAsync(storageKey(alias), options);
+    } catch {
+      /* already gone, or no entitlement for that group */
+    }
   }
 }
 

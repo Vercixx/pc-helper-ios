@@ -17,6 +17,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.vercixx.wolunlock",
       "buildNumber": "1",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.vercixx.wolunlock"]
+      },
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "PC Unlock finds your computer on this network and sends it wake and unlock commands. Without this permission it cannot reach your PC.",
         "NSBonjourServices": ["_wol-unlock._tcp"],
@@ -48,7 +51,8 @@
           "faceIDPermission": "Face ID protects the key that unlocks your PC."
         }
       ],
-      "expo-local-authentication"
+      "expo-local-authentication",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true

@@ -14,6 +14,7 @@
     "build:preview": "eas build --profile preview --platform ios"
   },
   "dependencies": {
+    "@bacons/apple-targets": "^5.0.0",
     "@expo/ui": "~57.0.9",
     "@noble/ed25519": "^3.1.0",
     "@noble/hashes": "^2.2.0",
