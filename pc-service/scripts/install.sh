@@ -54,6 +54,22 @@ else
 fi
 ok "installed into $VENV"
 
+# Put the commands somewhere the user's shell will actually find them. Printing
+# instructions instead is no good: the step that printed them came after the
+# service check, so a failed start meant never seeing them at all.
+BIN_DIR="$HOME/.local/bin"
+mkdir -p "$BIN_DIR"
+for tool in wol-unlock wol-unlockctl; do
+    ln -sf "$VENV/bin/$tool" "$BIN_DIR/$tool"
+done
+if grep -q "$BIN_DIR" <<<"$PATH"; then
+    ok "linked wol-unlock and wol-unlockctl into $BIN_DIR"
+else
+    warn "linked the tools into $BIN_DIR, which is not on your PATH. Add it:"
+    echo "    fish_add_path $BIN_DIR          # fish"
+    echo "    export PATH=\"$BIN_DIR:\$PATH\"   # bash/zsh, in your shell rc"
+fi
+
 # --- 3. Configuration -------------------------------------------------------
 mkdir -p "$CONFIG_DIR"
 chmod 700 "$CONFIG_DIR"
@@ -120,9 +136,3 @@ echo "  Follow the log:    journalctl --user -u wol-unlock -f"
 echo
 echo "  Wake-on-LAN needs a one-time NIC/BIOS change:"
 echo "                     sudo $REPO_DIR/scripts/enable-wol.sh"
-echo
-if ! grep -q "$VENV/bin" <<<"$PATH"; then
-    echo "  Add the tools to your PATH:"
-    echo "      ln -s $VENV/bin/wol-unlockctl ~/.local/bin/wol-unlockctl"
-    echo "      ln -s $VENV/bin/wol-unlock    ~/.local/bin/wol-unlock"
-fi
