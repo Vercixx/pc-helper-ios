@@ -112,11 +112,24 @@ private func statusColor(reachable: Bool, locked: Bool?) -> Color {
   return locked ? .orange : .green
 }
 
+// Strings are keyed and resolved out of this *extension's* bundle -- an app
+// extension is its own bundle, so `Bundle.main` here is the .appex and the
+// translations live in `targets/widget/<lang>.lproj/`, not with the app's.
+// They follow the system language: a widget is rendered by WidgetKit, often
+// while the app is not running at all.
 private func headline(_ entry: PCEntry) -> String {
-  guard entry.pc != nil else { return "Not paired" }
-  guard entry.reachable else { return "Asleep" }
-  guard let locked = entry.locked else { return "Nobody logged in" }
-  return locked ? "Locked" : "Unlocked"
+  guard entry.pc != nil else {
+    return String(localized: "widget.notPaired", defaultValue: "Not paired")
+  }
+  guard entry.reachable else {
+    return String(localized: "widget.asleep", defaultValue: "Asleep")
+  }
+  guard let locked = entry.locked else {
+    return String(localized: "widget.noUser", defaultValue: "Nobody logged in")
+  }
+  return locked
+    ? String(localized: "widget.locked", defaultValue: "Locked")
+    : String(localized: "widget.unlocked", defaultValue: "Unlocked")
 }
 
 private func footnote(_ entry: PCEntry) -> String? {
@@ -124,12 +137,14 @@ private func footnote(_ entry: PCEntry) -> String? {
   case .live:
     return nil
   case .unpaired:
-    return "Open PC Unlock"
+    return String(localized: "widget.openApp", defaultValue: "Open PC Unlock")
   case .cached(let at):
-    guard let at else { return "cached" }
+    guard let at else { return String(localized: "widget.cached", defaultValue: "cached") }
+    // The formatter localizes the age itself, from the system language.
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .abbreviated
-    return "cached · " + formatter.localizedString(for: at, relativeTo: Date())
+    let age = formatter.localizedString(for: at, relativeTo: Date())
+    return String(localized: "widget.cachedAt", defaultValue: "cached · \(age)")
   }
 }
 
@@ -191,7 +206,7 @@ struct StatusWidgetView: View {
 
       if let pc = entry.pc, !pc.macs.isEmpty {
         Button(intent: WakePCIntent(pcId: pc.id)) {
-          Label("Wake", systemImage: "power")
+          Label(String(localized: "widget.wake", defaultValue: "Wake"), systemImage: "power")
             .font(.footnote.weight(.semibold))
             .frame(maxWidth: .infinity)
         }
@@ -210,8 +225,15 @@ struct StatusWidget: Widget {
       StatusWidgetView(entry: entry)
         .containerBackground(.fill.tertiary, for: .widget)
     }
-    .configurationDisplayName("PC status")
-    .description("Whether your PC is awake and locked, with a button to wake it.")
+    .configurationDisplayName(
+      LocalizedStringResource("widget.displayName", defaultValue: "PC status")
+    )
+    .description(
+      LocalizedStringResource(
+        "widget.description",
+        defaultValue: "Whether your PC is awake and locked, with a button to wake it."
+      )
+    )
     .supportedFamilies([
       .systemSmall,
       .systemMedium,

@@ -25,6 +25,7 @@ import { pairWithPC } from "@/actions/pair";
 import { fetchServerInfo } from "@/api/client";
 import { ApiError } from "@/api/types";
 import { CODE_LENGTH, normalizeCode } from "@/crypto/canonical";
+import { splitAround, useT } from "@/i18n";
 import { colors, spacing, styles as shared } from "@/ui/theme";
 
 type Params = {
@@ -41,6 +42,7 @@ type Phase = "form" | "checking" | "waiting" | "done";
 export default function PairScreen() {
   const params = useLocalSearchParams<Params>();
   const router = useRouter();
+  const t = useT();
 
   const [host, setHost] = useState(params.host ?? "");
   const [port, setPort] = useState(params.port ?? "8765");
@@ -62,6 +64,8 @@ export default function PairScreen() {
     [host, portNumber],
   );
 
+  const [codeHintBefore, codeHintAfter] = splitAround(t("pair.code.hint"), "cmd");
+
   async function submit() {
     setError(null);
     setNote(null);
@@ -76,7 +80,7 @@ export default function PairScreen() {
         const info = await fetchServerInfo(endpoint);
         expected = info.fp;
         setFingerprint(expected);
-        setNote(`Pairing with "${info.name}".`);
+        setNote(t("pair.with", { name: info.name }));
       }
 
       setPhase("waiting");
@@ -102,14 +106,16 @@ export default function PairScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: scanned ? "Confirm pairing" : "Pair with a PC" }} />
+      <Stack.Screen
+        options={{ title: scanned ? t("nav.confirmPairing") : t("nav.pairWithPC") }}
+      />
       <KeyboardAvoidingView
         style={shared.screen}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView contentContainerStyle={local.content} keyboardShouldPersistTaps="handled">
           <View style={shared.card}>
-            <Text style={local.label}>PAIRING CODE</Text>
+            <Text style={local.label}>{t("pair.code.label")}</Text>
             <TextInput
               value={code}
               onChangeText={(text) => setCode(normalizeCode(text).slice(0, CODE_LENGTH))}
@@ -119,16 +125,17 @@ export default function PairScreen() {
               autoFocus={!params.code}
               maxLength={CODE_LENGTH + 1}
               style={local.codeInput}
-              accessibilityLabel="Pairing code"
+              accessibilityLabel={t("pair.code.a11y")}
             />
             <Text style={shared.caption}>
-              Shown by <Text style={shared.mono}>wol-unlockctl pair</Text> on the PC. It
-              expires after two minutes.
+              {codeHintBefore}
+              <Text style={shared.mono}>wol-unlockctl pair</Text>
+              {codeHintAfter}
             </Text>
           </View>
 
           <View style={shared.card}>
-            <Text style={local.label}>PC ADDRESS</Text>
+            <Text style={local.label}>{t("pair.address.label")}</Text>
             <TextInput
               value={host}
               onChangeText={setHost}
@@ -137,7 +144,7 @@ export default function PairScreen() {
               autoCorrect={false}
               keyboardType="url"
               style={local.input}
-              accessibilityLabel="PC hostname"
+              accessibilityLabel={t("pair.host.a11y")}
             />
             <TextInput
               value={port}
@@ -145,23 +152,19 @@ export default function PairScreen() {
               placeholder="8765"
               keyboardType="number-pad"
               style={local.input}
-              accessibilityLabel="Port"
+              accessibilityLabel={t("pair.port.a11y")}
             />
             {!portReady ? (
-              <Text style={[shared.caption, { color: colors.red }]}>
-                Port must be between 1 and 65535.
-              </Text>
+              <Text style={[shared.caption, { color: colors.red }]}>{t("pair.port.range")}</Text>
             ) : null}
           </View>
 
           {fingerprint ? (
             <View style={shared.card}>
-              <Text style={local.label}>PC IDENTITY</Text>
+              <Text style={local.label}>{t("pair.identity.label")}</Text>
               <Text style={shared.mono}>{fingerprint}</Text>
               <Text style={shared.caption}>
-                {scanned
-                  ? "From the QR code. Pairing stops if the PC presents anything else."
-                  : "Check this matches the fingerprint shown on the PC."}
+                {scanned ? t("pair.identity.scanned") : t("pair.identity.manual")}
               </Text>
             </View>
           ) : null}
@@ -170,10 +173,8 @@ export default function PairScreen() {
             <View style={[shared.card, local.waiting]}>
               <ActivityIndicator />
               <View style={local.grow}>
-                <Text style={shared.body}>Waiting for approval</Text>
-                <Text style={shared.caption}>
-                  Confirm this device at the PC. Compare the fingerprint it shows.
-                </Text>
+                <Text style={shared.body}>{t("pair.waiting.title")}</Text>
+                <Text style={shared.caption}>{t("pair.waiting.body")}</Text>
               </View>
             </View>
           ) : null}
@@ -194,10 +195,10 @@ export default function PairScreen() {
           >
             <Text style={shared.primaryButtonLabel}>
               {phase === "checking"
-                ? "Contacting PC…"
+                ? t("pair.contacting")
                 : phase === "waiting"
-                  ? "Waiting…"
-                  : "Pair"}
+                  ? t("pair.waiting")
+                  : t("pair.submit")}
             </Text>
           </Pressable>
         </ScrollView>

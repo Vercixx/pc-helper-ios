@@ -3,7 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["jest"],
+    // `node` is for the tests only: the catalogue-parity suite reads the
+    // native .strings and .lproj files off disk, which is the only way to
+    // check keys Swift resolves at runtime. No app code imports it.
+    "types": ["jest", "node"],
     "paths": {
       "@/*": ["./src/*"],
       "@modules/*": ["./modules/*"]

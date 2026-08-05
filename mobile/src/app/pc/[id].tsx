@@ -23,6 +23,7 @@ import {
 } from "@modules/app-group";
 
 import { usePCActions } from "@/actions/usePCActions";
+import { useLocale, useT, type MessageKey } from "@/i18n";
 import { usePCStore } from "@/state/store";
 import { isWidgetStorageWorking } from "@/state/widgetBridge";
 import { colors, spacing, styles as shared } from "@/ui/theme";
@@ -30,6 +31,8 @@ import { colors, spacing, styles as shared } from "@/ui/theme";
 export default function PCDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const t = useT();
+  const locale = useLocale();
 
   const pc = usePCStore(useCallback((state) => state.pcs.find((item) => item.id === id), [id]));
   const status = usePCStore(useCallback((state) => (id ? state.statuses[id] : undefined), [id]));
@@ -46,19 +49,19 @@ export default function PCDetailScreen() {
   if (!pc) {
     return (
       <View style={shared.centered}>
-        <Text style={shared.body}>This PC is no longer paired.</Text>
+        <Text style={shared.body}>{t("detail.gone")}</Text>
       </View>
     );
   }
 
   const confirmUnpair = () =>
     Alert.alert(
-      `Unpair ${pc.name}?`,
-      "This phone's key will be deleted. The PC will keep its record until you revoke it there with 'wol-unlockctl revoke'.",
+      t("detail.unpair.title", { name: pc.name }),
+      t("detail.unpair.body"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Unpair",
+          text: t("detail.unpair.confirm"),
           style: "destructive",
           onPress: async () => {
             await removePC(pc.id);
@@ -82,13 +85,13 @@ export default function PCDetailScreen() {
         <View style={shared.card}>
           <View style={local.statusRow}>
             <View style={[local.dot, { backgroundColor: dotColor(status?.reachable, status?.locked) }]} />
-            <Text style={shared.body}>{headline(status, busy)}</Text>
+            <Text style={shared.body}>{headline(status, busy, t)}</Text>
             {busy === "status" ? <ActivityIndicator size="small" /> : null}
           </View>
           {status?.error ? <Text style={shared.caption}>{status.error}</Text> : null}
           {status?.sessionId ? (
             <Text style={shared.caption}>
-              Session {status.sessionId}
+              {t("detail.session", { id: status.sessionId })}
               {status.desktop ? ` · ${status.desktop}` : ""}
             </Text>
           ) : null}
@@ -112,17 +115,17 @@ export default function PCDetailScreen() {
 
         <View style={local.actions}>
           <ActionButton
-            label={busy === "wake" ? "Waking…" : "Wake up"}
+            label={busy === "wake" ? t("status.waking") : t("action.wake")}
             disabled={!canWake || busy !== null}
             onPress={() => void wake()}
           />
           <ActionButton
-            label={busy === "unlock" ? "Unlocking…" : "Unlock session"}
+            label={busy === "unlock" ? t("status.unlocking") : t("action.unlock")}
             disabled={!canUnlock || busy !== null}
             onPress={() => void unlock()}
           />
           <ActionButton
-            label="Refresh"
+            label={t("action.refresh")}
             secondary
             disabled={busy !== null}
             onPress={() => void refresh()}
@@ -130,28 +133,38 @@ export default function PCDetailScreen() {
         </View>
 
         <View style={shared.card}>
-          <Detail label="Address" value={`${pc.hostname}:${pc.port}`} />
-          {pc.lastIp ? <Detail label="Last IP" value={pc.lastIp} /> : null}
-          <Detail label="Capabilities" value={pc.capabilities.join(", ") || "none"} />
+          <Detail label={t("detail.address")} value={`${pc.hostname}:${pc.port}`} />
+          {pc.lastIp ? <Detail label={t("detail.lastIp")} value={pc.lastIp} /> : null}
           <Detail
-            label="Wake targets"
-            value={pc.wake.macs.length > 0 ? pc.wake.macs.join("\n") : "none configured"}
+            label={t("detail.capabilities")}
+            value={pc.capabilities.join(", ") || t("common.none")}
           />
           <Detail
-            label="Unlock confirmation"
-            value={pc.requireBiometricsForUnlock === false ? "None" : "Face ID / passcode"}
+            label={t("detail.wakeTargets")}
+            value={pc.wake.macs.length > 0 ? pc.wake.macs.join("\n") : t("detail.noTargets")}
           />
-          <Detail label="This device's ID" value={pc.deviceId} mono />
-          <Detail label="PC fingerprint" value={pc.serverFp} mono />
-          <Detail label="Paired" value={new Date(pc.pairedAt).toLocaleString()} />
+          <Detail
+            label={t("detail.unlockConfirmation")}
+            value={
+              pc.requireBiometricsForUnlock === false
+                ? t("detail.confirmNone")
+                : t("detail.confirmBiometric")
+            }
+          />
+          <Detail label={t("detail.deviceId")} value={pc.deviceId} mono />
+          <Detail label={t("detail.fingerprint")} value={pc.serverFp} mono />
+          <Detail
+            label={t("detail.pairedAt")}
+            value={new Date(pc.pairedAt).toLocaleString(locale)}
+          />
           {/* Whether widgets can work at all on this install. A re-signing tool
               rewrites the App Group, so what matters is the identifier granted
               at runtime, not the one in app.json. */}
-          <Detail label="Widget storage" value={widgetStorageSummary()} mono />
+          <Detail label={t("detail.widgetStorage")} value={widgetStorageSummary(t)} mono />
         </View>
 
         <Pressable style={[shared.card, local.destructive]} onPress={confirmUnpair}>
-          <Text style={{ color: colors.red, fontSize: 17 }}>Unpair this PC</Text>
+          <Text style={{ color: colors.red, fontSize: 17 }}>{t("detail.unpair")}</Text>
         </Pressable>
       </ScrollView>
     </>
@@ -207,20 +220,21 @@ function Detail({ label, value, mono }: { label: string; value: string; mono?: b
  * present means the profile parsed and the group really was stripped, which is
  * a signing-side fact no code change can undo.
  */
-function widgetStorageSummary(): string {
+function widgetStorageSummary(t: (key: MessageKey, params?: Record<string, string>) => string) {
   const granted = appGroups();
   if (granted.length > 0) {
     const chosen = sharedAppGroup() ?? granted[0]!;
-    return `${isWidgetStorageWorking() ? "ok" : "not writable"}\n${chosen}`;
+    return `${isWidgetStorageWorking() ? t("widget.ok") : t("widget.notWritable")}\n${chosen}`;
   }
 
   const keys = entitlementKeys();
   if (keys.length > 0) {
-    return `no App Group in the signed profile\nprofile grants: ${keys.join(", ")}`;
+    return `${t("widget.noGroup")}\n${t("widget.grants", { keys: keys.join(", ") })}`;
   }
+  const bundle = bundleIdentifier() ?? "?";
   return hasProvisioningProfile()
-    ? `profile present but unreadable\n${bundleIdentifier() ?? "?"}`
-    : `no provisioning profile\n${bundleIdentifier() ?? "?"}`;
+    ? `${t("widget.unreadable")}\n${bundle}`
+    : `${t("widget.noProfile")}\n${bundle}`;
 }
 
 function dotColor(reachable: boolean | undefined, locked: boolean | null | undefined): string {
@@ -232,13 +246,14 @@ function dotColor(reachable: boolean | undefined, locked: boolean | null | undef
 function headline(
   status: { reachable: boolean; locked: boolean | null } | undefined,
   busy: string | null,
+  t: (key: MessageKey) => string,
 ): string {
-  if (busy === "wake") return "Waking…";
-  if (busy === "unlock") return "Unlocking…";
-  if (!status) return "Checking…";
-  if (!status.reachable) return "Asleep or unreachable";
-  if (status.locked === null) return "Online — nobody logged in";
-  return status.locked ? "Locked" : "Unlocked";
+  if (busy === "wake") return t("status.waking");
+  if (busy === "unlock") return t("status.unlocking");
+  if (!status) return t("status.checking");
+  if (!status.reachable) return t("status.asleep");
+  if (status.locked === null) return t("status.noUser");
+  return status.locked ? t("status.locked") : t("status.unlocked");
 }
 
 const local = StyleSheet.create({

@@ -12,11 +12,13 @@ import { useCallback, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { parsePairingTicket } from "@/actions/pair";
+import { useT } from "@/i18n";
 import { spacing, styles as shared } from "@/ui/theme";
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const router = useRouter();
+  const t = useT();
   const [problem, setProblem] = useState<string | null>(null);
   // The camera fires repeatedly for the same code; latch so navigation happens
   // exactly once.
@@ -28,7 +30,7 @@ export default function ScanScreen() {
 
       const ticket = parsePairingTicket(data);
       if (!ticket) {
-        setProblem("That isn't a PC Unlock pairing code.");
+        setProblem(t("scan.notATicket"));
         return;
       }
 
@@ -47,7 +49,7 @@ export default function ScanScreen() {
         },
       });
     },
-    [router],
+    [router, t],
   );
 
   if (!permission) {
@@ -57,14 +59,12 @@ export default function ScanScreen() {
   if (!permission.granted) {
     return (
       <>
-        <Stack.Screen options={{ title: "Camera" }} />
+        <Stack.Screen options={{ title: t("nav.camera") }} />
         <View style={shared.centered}>
-          <Text style={shared.title}>Camera access needed</Text>
-          <Text style={[shared.caption, local.center]}>
-            The pairing code is shown as a QR code on your PC's screen.
-          </Text>
+          <Text style={shared.title}>{t("scan.permission.title")}</Text>
+          <Text style={[shared.caption, local.center]}>{t("scan.permission.body")}</Text>
           <Pressable style={[shared.primaryButton, local.stretch]} onPress={requestPermission}>
-            <Text style={shared.primaryButtonLabel}>Allow camera</Text>
+            <Text style={shared.primaryButtonLabel}>{t("scan.permission.allow")}</Text>
           </Pressable>
         </View>
       </>
@@ -73,7 +73,7 @@ export default function ScanScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Scan QR code" }} />
+      <Stack.Screen options={{ title: t("nav.scan") }} />
       <View style={local.fill}>
         <CameraView
           style={StyleSheet.absoluteFill}
@@ -83,9 +83,7 @@ export default function ScanScreen() {
         />
         <View style={local.overlay} pointerEvents="none">
           <View style={local.reticle} />
-          <Text style={local.hint}>
-            {problem ?? "Point at the QR code shown by wol-unlockctl pair"}
-          </Text>
+          <Text style={local.hint}>{problem ?? t("scan.hint")}</Text>
         </View>
       </View>
     </>

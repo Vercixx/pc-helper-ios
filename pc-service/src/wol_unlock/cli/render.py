@@ -1,4 +1,8 @@
-"""Rich-based rendering for the terminal UI."""
+"""Rich-based rendering for the terminal UI.
+
+Every visible string goes through ``i18n._``; see that module for the language
+selection and for why ApiError messages are excluded.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +18,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from ..i18n import _
+
 console = Console()
 
 
@@ -23,24 +29,26 @@ console = Console()
 
 def fmt_ts(ts: int | None) -> str:
     if not ts:
-        return "never"
+        return _("never")
     when = time.strftime("%Y-%m-%d %H:%M", time.localtime(ts))
     return f"{when} ({fmt_ago(ts)})"
 
 
 def fmt_ago(ts: int | None) -> str:
     if not ts:
-        return "never"
+        return _("never")
     delta = int(time.time()) - int(ts)
     if delta < 0:
-        return "in the future"
-    for size, unit in ((86400, "d"), (3600, "h"), (60, "m")):
+        return _("future")
+    for size, key in ((86400, "ago.d"), (3600, "ago.h"), (60, "ago.m")):
         if delta >= size:
-            return f"{delta // size}{unit} ago"
-    return f"{delta}s ago"
+            return _(key, n=delta // size)
+    return _("ago.s", n=delta)
 
 
-def fmt_bool(value: Any, yes: str = "yes", no: str = "no") -> Text:
+def fmt_bool(value: Any, yes: str | None = None, no: str | None = None) -> Text:
+    yes = _("yes") if yes is None else yes
+    no = _("no") if no is None else no
     return Text(yes, style="green") if value else Text(no, style="dim")
 
 
@@ -77,23 +85,23 @@ def render_pairing_panel(data: dict[str, Any], *, show_qr: bool = True,
     blocks.append(
         Align.center(
             Text.assemble(
-                ("Scan the code, or type it into the app.  ", "dim"),
-                (f"Expires in {data.get('expires_in_s', 0)}s", "yellow"),
+                (_("pair.scan"), "dim"),
+                (_("pair.expires", n=data.get("expires_in_s", 0)), "yellow"),
             )
         )
     )
     if data.get("require_approval", True):
         blocks.append(
-            Align.center(Text("You will be asked to approve the device here.", style="dim"))
+            Align.center(Text(_("pair.willApprove"), style="dim"))
         )
     blocks.append(Text(""))
     blocks.append(
-        Align.center(Text(f"server fingerprint  {data.get('server_fp', '')[:16]}…", style="dim"))
+        Align.center(Text(_("pair.fingerprint", fp=data.get("server_fp", "")[:16]), style="dim"))
     )
 
     return Panel(
         Group(*blocks),
-        title="[bold]Pairing mode[/bold]",
+        title=f"[bold]{_('pair.title')}[/bold]",
         border_style="cyan",
         padding=(1, 2),
     )
@@ -104,14 +112,14 @@ def render_pairing_panel(data: dict[str, Any], *, show_qr: bool = True,
 # --------------------------------------------------------------------------- #
 
 def render_devices(devices: Sequence[dict[str, Any]]) -> Table:
-    table = Table(title="Trusted devices", header_style="bold", expand=False)
-    table.add_column("Device", style="bold")
-    table.add_column("ID")
-    table.add_column("Fingerprint")
-    table.add_column("Platform")
-    table.add_column("Paired")
-    table.add_column("Last seen")
-    table.add_column("State")
+    table = Table(title=_("devices.title"), header_style="bold", expand=False)
+    table.add_column(_("devices.name"), style="bold")
+    table.add_column(_("devices.id"))
+    table.add_column(_("devices.fp"))
+    table.add_column(_("devices.platform"))
+    table.add_column(_("devices.paired"))
+    table.add_column(_("devices.lastSeen"))
+    table.add_column(_("devices.state"))
 
     for device in devices:
         revoked = device.get("revoked")
@@ -122,7 +130,9 @@ def render_devices(devices: Sequence[dict[str, Any]]) -> Table:
             device.get("platform") or "-",
             fmt_ago(device.get("paired_at")),
             fmt_ago(device.get("last_seen_at")),
-            Text("revoked", style="red") if revoked else Text("active", style="green"),
+            Text(_("devices.revoked"), style="red")
+            if revoked
+            else Text(_("devices.active"), style="green"),
         )
     return table
 
@@ -132,24 +142,31 @@ def render_status(data: dict[str, Any]) -> Group:
     head.add_column(style="dim", justify="right")
     head.add_column()
 
-    head.add_row("name", str(data.get("name", "")))
-    head.add_row("fingerprint", str(data.get("fp", "")))
-    head.add_row("api", str(data.get("api", "")))
-    head.add_row("uptime", f"{data.get('uptime_s', 0)}s")
+    head.add_row(_("status.name"), str(data.get("name", "")))
+    head.add_row(_("status.fingerprint"), str(data.get("fp", "")))
+    head.add_row(_("status.api"), str(data.get("api", "")))
+    head.add_row(_("status.uptime"), f"{data.get('uptime_s', 0)}s")
     http = data.get("http") or {}
-    head.add_row("listening", f"{http.get('bind')}:{http.get('port')}")
-    head.add_row("allowed", ", ".join(http.get("allowed_networks") or []))
-    head.add_row("devices", str(data.get("devices", 0)))
-    head.add_row("capabilities", ", ".join(data.get("caps") or []))
-    head.add_row("unlock", fmt_bool(data.get("unlock_enabled"), "enabled", "disabled"))
+    head.add_row(_("status.listening"), f"{http.get('bind')}:{http.get('port')}")
+    head.add_row(_("status.allowed"), ", ".join(http.get("allowed_networks") or []))
+    head.add_row(_("status.devices"), str(data.get("devices", 0)))
+    head.add_row(_("status.capabilities"), ", ".join(data.get("caps") or []))
+    head.add_row(
+        _("status.unlock"),
+        fmt_bool(data.get("unlock_enabled"), _("status.enabled"), _("status.disabled")),
+    )
     if data.get("config_path"):
-        head.add_row("config", str(data["config_path"]))
+        head.add_row(_("status.config"), str(data["config_path"]))
 
     session = data.get("session")
     if session:
-        state = Text("locked", style="yellow") if session.get("locked") else Text("unlocked", style="green")
+        state = (
+            Text(_("status.locked"), style="yellow")
+            if session.get("locked")
+            else Text(_("status.unlocked"), style="green")
+        )
         head.add_row(
-            "session",
+            _("status.session"),
             Text.assemble(
                 f"{session.get('id')} ",
                 (f"{session.get('desktop') or '?'}/{session.get('type')} ", "dim"),
@@ -157,26 +174,33 @@ def render_status(data: dict[str, Any]) -> Group:
             ),
         )
     else:
-        head.add_row("session", Text("none found", style="red"))
+        head.add_row(_("status.session"), Text(_("status.noSession"), style="red"))
 
     pairing = data.get("pairing") or {}
     if pairing.get("active"):
         head.add_row(
-            "pairing",
-            Text(f"{pairing.get('state')} ({pairing.get('expires_in_s', 0)}s left)", style="cyan"),
+            _("status.pairing"),
+            Text(
+                _(
+                    "status.pairingOpen",
+                    state=pairing.get("state"),
+                    n=pairing.get("expires_in_s", 0),
+                ),
+                style="cyan",
+            ),
         )
     else:
-        head.add_row("pairing", Text("closed", style="dim"))
+        head.add_row(_("status.pairing"), Text(_("status.pairingClosed"), style="dim"))
 
     blocks: list[Any] = [Panel(head, title="[bold]wol-unlock[/bold]", border_style="blue")]
 
     targets = data.get("wake_targets") or []
     if targets:
-        table = Table(title="Wake targets", header_style="bold")
-        table.add_column("MAC")
-        table.add_column("Interface")
-        table.add_column("Broadcast")
-        table.add_column("Link")
+        table = Table(title=_("wake.title"), header_style="bold")
+        table.add_column(_("wake.mac"))
+        table.add_column(_("wake.iface"))
+        table.add_column(_("wake.broadcast"))
+        table.add_column(_("wake.link"))
         for target in targets:
             link = target.get("link", "?")
             style = "green" if link == "up" else "yellow" if link == "down" else "dim"
@@ -192,13 +216,13 @@ def render_status(data: dict[str, Any]) -> Group:
 
 
 def render_audit(entries: Sequence[dict[str, Any]]) -> Table:
-    table = Table(title="Recent activity", header_style="bold")
-    table.add_column("When", style="dim")
-    table.add_column("Action")
-    table.add_column("Result")
-    table.add_column("Device")
-    table.add_column("From", style="dim")
-    table.add_column("Detail", style="dim", overflow="fold")
+    table = Table(title=_("audit.title"), header_style="bold")
+    table.add_column(_("audit.when"), style="dim")
+    table.add_column(_("audit.action"))
+    table.add_column(_("audit.result"))
+    table.add_column(_("audit.device"))
+    table.add_column(_("audit.from"), style="dim")
+    table.add_column(_("audit.detail"), style="dim", overflow="fold")
 
     for entry in reversed(list(entries)):
         result = entry.get("result", "")
@@ -215,13 +239,13 @@ def render_audit(entries: Sequence[dict[str, Any]]) -> Table:
 
 
 def render_discovered(services: Sequence[dict[str, Any]]) -> Table:
-    table = Table(title="Discovered services (_wol-unlock._tcp)", header_style="bold")
-    table.add_column("Name", style="bold")
-    table.add_column("Host")
-    table.add_column("Addresses")
-    table.add_column("Fingerprint")
-    table.add_column("Caps")
-    table.add_column("Pairing")
+    table = Table(title=_("discover.title"), header_style="bold")
+    table.add_column(_("discover.name"), style="bold")
+    table.add_column(_("discover.host"))
+    table.add_column(_("discover.addresses"))
+    table.add_column(_("discover.fp"))
+    table.add_column(_("discover.caps"))
+    table.add_column(_("discover.pairing"))
 
     for service in services:
         table.add_row(
@@ -230,6 +254,6 @@ def render_discovered(services: Sequence[dict[str, Any]]) -> Table:
             ", ".join(service.get("addresses") or []),
             (service.get("fp") or "")[:16] + "…",
             service.get("caps") or "",
-            fmt_bool(service.get("pair") == "1", "open", "closed"),
+            fmt_bool(service.get("pair") == "1", _("discover.open"), _("discover.closed")),
         )
     return table

@@ -16,6 +16,7 @@ from typing import Any
 from rich.text import Text
 
 from ..config import control_socket_path
+from ..i18n import _
 from ..control.client import ControlClient, ControlError
 from ..control import protocol as P
 from . import render
@@ -25,39 +26,31 @@ from .render import console
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="wol-unlockctl",
-        description="Manage the wol-unlock service running for this user.",
+        description=_("cli.description"),
     )
-    parser.add_argument("--socket", default=None, help="path to the control socket")
+    parser.add_argument("--socket", default=None, help=_("cli.socket"))
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("status", help="show service, session and wake status")
+    sub.add_parser("status", help=_("cli.cmd.status"))
 
-    pair = sub.add_parser("pair", help="open a pairing window and show the code/QR")
-    pair.add_argument("--window", type=int, default=None, help="window length in seconds")
-    pair.add_argument("--no-qr", action="store_true", help="print only the code")
-    pair.add_argument(
-        "--light-terminal",
-        action="store_true",
-        help="invert the QR for terminals with a light background",
-    )
-    pair.add_argument(
-        "--yes",
-        action="store_true",
-        help="approve the first device automatically (for scripted setup)",
-    )
+    pair = sub.add_parser("pair", help=_("cli.cmd.pair"))
+    pair.add_argument("--window", type=int, default=None, help=_("cli.opt.window"))
+    pair.add_argument("--no-qr", action="store_true", help=_("cli.opt.noQr"))
+    pair.add_argument("--light-terminal", action="store_true", help=_("cli.opt.lightTerminal"))
+    pair.add_argument("--yes", action="store_true", help=_("cli.opt.yes"))
 
-    sub.add_parser("devices", help="list trusted devices")
+    sub.add_parser("devices", help=_("cli.cmd.devices"))
 
-    revoke = sub.add_parser("revoke", help="revoke a device by id, name or fingerprint prefix")
+    revoke = sub.add_parser("revoke", help=_("cli.cmd.revoke"))
     revoke.add_argument("device")
 
-    remove = sub.add_parser("remove", help="delete a device record entirely")
+    remove = sub.add_parser("remove", help=_("cli.cmd.remove"))
     remove.add_argument("device")
 
-    audit = sub.add_parser("audit", help="show recent activity")
+    audit = sub.add_parser("audit", help=_("cli.cmd.audit"))
     audit.add_argument("-n", "--limit", type=int, default=25)
 
-    discover = sub.add_parser("discover", help="browse the LAN for advertised services")
+    discover = sub.add_parser("discover", help=_("cli.cmd.discover"))
     discover.add_argument("--timeout", type=float, default=3.0)
 
     return parser
@@ -76,7 +69,7 @@ async def cmd_devices(client: ControlClient, _args: argparse.Namespace) -> int:
     data = await client.call(P.CMD_DEVICES_LIST)
     devices = data.get("devices") or []
     if not devices:
-        console.print("[dim]No devices are paired. Run[/dim] wol-unlockctl pair")
+        console.print(f"[dim]{_('cli.noDevices')}[/dim] wol-unlockctl pair")
         return 0
     console.print(render.render_devices(devices))
     return 0
@@ -86,16 +79,20 @@ async def cmd_revoke(client: ControlClient, args: argparse.Namespace) -> int:
     data = await client.call(P.CMD_DEVICES_REVOKE, device=args.device)
     device = data.get("device") or {}
     if data.get("changed"):
-        console.print(f"[green]Revoked[/green] {device.get('name')} ({device.get('device_id')})")
+        console.print(
+            f"[green]{_('cli.revoked')}[/green] {device.get('name')} ({device.get('device_id')})"
+        )
     else:
-        console.print(f"[yellow]{device.get('name')} was already revoked[/yellow]")
+        console.print(f"[yellow]{_('cli.alreadyRevoked', name=device.get('name'))}[/yellow]")
     return 0
 
 
 async def cmd_remove(client: ControlClient, args: argparse.Namespace) -> int:
     data = await client.call(P.CMD_DEVICES_DELETE, device=args.device)
     device = data.get("device") or {}
-    console.print(f"[green]Deleted[/green] {device.get('name')} ({device.get('device_id')})")
+    console.print(
+        f"[green]{_('cli.deleted')}[/green] {device.get('name')} ({device.get('device_id')})"
+    )
     return 0
 
 
@@ -103,7 +100,7 @@ async def cmd_audit(client: ControlClient, args: argparse.Namespace) -> int:
     data = await client.call(P.CMD_AUDIT_TAIL, limit=args.limit)
     entries = data.get("entries") or []
     if not entries:
-        console.print("[dim]No activity recorded yet.[/dim]")
+        console.print(f"[dim]{_('cli.noActivity')}[/dim]")
         return 0
     console.print(render.render_audit(entries))
     return 0
@@ -117,7 +114,7 @@ async def cmd_pair(client: ControlClient, args: argparse.Namespace) -> int:
             opened, show_qr=not args.no_qr, light_terminal=args.light_terminal
         )
     )
-    console.print("[dim]Press Ctrl-C to cancel.[/dim]\n")
+    console.print(f"[dim]{_('cli.cancelHint')}[/dim]\n")
 
     deadline = asyncio.get_running_loop().time() + float(opened.get("expires_in_s", 120)) + 90
 
@@ -125,12 +122,12 @@ async def cmd_pair(client: ControlClient, args: argparse.Namespace) -> int:
         while True:
             remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
-                console.print("[yellow]Pairing window closed.[/yellow]")
+                console.print(f"[yellow]{_('cli.windowClosed')}[/yellow]")
                 return 1
 
             event = await client.next_event(timeout=remaining)
             if event is None:
-                console.print("[yellow]Pairing window closed.[/yellow]")
+                console.print(f"[yellow]{_('cli.windowClosed')}[/yellow]")
                 return 1
 
             name = event.get("event")
@@ -142,21 +139,21 @@ async def cmd_pair(client: ControlClient, args: argparse.Namespace) -> int:
 
             elif name == P.EVENT_PAIR_COMPLETED:
                 console.print(
-                    f"\n[bold green]Paired[/bold green] {data.get('name')} "
+                    f"\n[bold green]{_('cli.paired')}[/bold green] {data.get('name')} "
                     f"([dim]{data.get('device_id')}[/dim])"
                 )
-                console.print("[dim]It can now wake and unlock this PC.[/dim]")
+                console.print(f"[dim]{_('cli.pairedHint')}[/dim]")
                 return 0
 
             elif name == P.EVENT_PAIR_CLOSED:
                 reason = data.get("reason", "closed")
                 if reason == "paired":
                     return 0
-                console.print(f"[yellow]Pairing window closed: {reason}[/yellow]")
+                console.print(f"[yellow]{_('cli.windowClosedReason', reason=reason)}[/yellow]")
                 return 1
 
     except (KeyboardInterrupt, asyncio.CancelledError):
-        console.print("\n[yellow]Cancelled.[/yellow]")
+        console.print(f"\n[yellow]{_('cli.cancelled')}[/yellow]")
         with contextlib.suppress(ControlError):
             await client.call(P.CMD_PAIR_CANCEL)
         return 130
@@ -173,30 +170,32 @@ async def _prompt_approval(
     """
     console.print(
         Text.assemble(
-            ("\nDevice requesting access\n", "bold"),
-            ("  name        ", "dim"), (f"{data.get('device_name')}\n", ""),
-            ("  platform    ", "dim"), (f"{data.get('platform') or '-'}\n", ""),
-            ("  device id   ", "dim"), (f"{data.get('device_id')}\n", ""),
-            ("  fingerprint ", "dim"), (f"{data.get('fp')}\n", "cyan"),
+            (f"\n{_('cli.request.title')}\n", "bold"),
+            (f"  {_('cli.request.name'):<12}", "dim"), (f"{data.get('device_name')}\n", ""),
+            (f"  {_('cli.request.platform'):<12}", "dim"), (f"{data.get('platform') or '-'}\n", ""),
+            (f"  {_('cli.request.id'):<12}", "dim"), (f"{data.get('device_id')}\n", ""),
+            (f"  {_('cli.request.fp'):<12}", "dim"), (f"{data.get('fp')}\n", "cyan"),
         )
     )
 
     if auto_yes:
-        console.print("[dim]--yes given; approving.[/dim]")
+        console.print(f"[dim]{_('cli.autoApprove')}[/dim]")
         await client.call(P.CMD_PAIR_APPROVE)
         return True
 
     try:
-        answer = await asyncio.to_thread(input, "Approve this device? [y/N] ")
+        answer = await asyncio.to_thread(input, _("cli.approvePrompt"))
     except (EOFError, KeyboardInterrupt):
         answer = ""
 
-    if answer.strip().lower() in ("y", "yes"):
+    # "y"/"yes" stay accepted in every language: they are what muscle memory
+    # types, and a Russian keyboard layout still has the Latin keys.
+    if answer.strip().lower() in ("y", "yes", _("cli.approveYes")):
         await client.call(P.CMD_PAIR_APPROVE)
         return True
 
     await client.call(P.CMD_PAIR_DENY)
-    console.print("[yellow]Denied.[/yellow]")
+    console.print(f"[yellow]{_('cli.denied')}[/yellow]")
     return False
 
 
@@ -204,11 +203,11 @@ async def cmd_discover(_client: ControlClient | None, args: argparse.Namespace) 
     """Browse for advertisements. Runs without the service, as a network test."""
     from ..discovery import browse
 
-    with console.status(f"Browsing _wol-unlock._tcp for {args.timeout:g}s…"):
+    with console.status(_("cli.browsing", timeout=args.timeout)):
         services = await browse(args.timeout)
     if not services:
-        console.print("[yellow]No services found.[/yellow]")
-        console.print("[dim]If the service is running here, check that udp/5353 is allowed.[/dim]")
+        console.print(f"[yellow]{_('cli.noServices')}[/yellow]")
+        console.print(f"[dim]{_('cli.noServicesHint')}[/dim]")
         return 1
     console.print(render.render_discovered(services))
     return 0

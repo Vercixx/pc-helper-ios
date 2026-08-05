@@ -13,15 +13,18 @@ import AppIntents
 import WidgetKit
 
 struct WakePCIntent: AppIntent {
-  static var title: LocalizedStringResource = "Wake PC"
+  static var title = LocalizedStringResource("intent.wake.title", defaultValue: "Wake PC")
   static var description = IntentDescription(
-    "Sends a Wake-on-LAN magic packet to your paired PC."
+    LocalizedStringResource(
+      "intent.wake.description",
+      defaultValue: "Sends a Wake-on-LAN magic packet to your paired PC."
+    )
   )
   /// Runs in the background: no reason to bounce the user into the app for a
   /// fire-and-forget UDP packet.
   static var openAppWhenRun: Bool = false
 
-  @Parameter(title: "PC")
+  @Parameter(title: LocalizedStringResource("entity.pc", defaultValue: "PC"))
   var pcId: String?
 
   init() {}
@@ -38,7 +41,10 @@ struct WakePCIntent: AppIntent {
 
     let result = MagicPacket.wake(pc: pc)
     guard result.packetsSent > 0 else {
-      throw WakeIntentError.sendFailed(result.error ?? "no packet could be sent")
+      throw WakeIntentError.sendFailed(
+        result.error
+          ?? String(localized: "intent.wake.nothingSent", defaultValue: "no packet could be sent")
+      )
     }
 
     // Nudge the timeline so the widget starts showing "Waking…" rather than a
@@ -55,9 +61,15 @@ enum WakeIntentError: Error, CustomLocalizedStringResourceConvertible {
   var localizedStringResource: LocalizedStringResource {
     switch self {
     case .notPaired:
-      return "No PC is paired yet. Open PC Unlock and pair one first."
+      return LocalizedStringResource(
+        "intent.error.notPaired",
+        defaultValue: "No PC is paired yet. Open PC Unlock and pair one first."
+      )
     case .sendFailed(let reason):
-      return "Couldn't send the wake packet: \(reason)"
+      return LocalizedStringResource(
+        "intent.error.wakeFailed",
+        defaultValue: "Couldn't send the wake packet: \(reason)"
+      )
     }
   }
 }

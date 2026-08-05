@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, config as config_mod
+from .i18n import _
 from .errors import ConfigError
 from .service import Service
 
@@ -17,24 +18,24 @@ from .service import Service
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="wol-unlock",
-        description="Signed LAN service for Wake-on-LAN and logind session unlock.",
+        description=_("svc.description"),
     )
     parser.add_argument("--version", action="version", version=f"wol-unlock {__version__}")
-    parser.add_argument("-c", "--config", type=Path, default=None, help="path to config.toml")
+    parser.add_argument("-c", "--config", type=Path, default=None, help=_("svc.opt.config"))
     parser.add_argument(
         "--write-default-config",
         action="store_true",
-        help="write a commented config reflecting this machine's interfaces, then exit",
+        help=_("svc.opt.writeDefault"),
     )
-    parser.add_argument("--force", action="store_true", help="overwrite an existing config")
+    parser.add_argument("--force", action="store_true", help=_("svc.opt.force"))
     parser.add_argument(
-        "--check", action="store_true", help="validate the configuration and exit"
+        "--check", action="store_true", help=_("svc.opt.check")
     )
     parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="logging verbosity",
+        help=_("svc.opt.logLevel"),
     )
     return parser
 
@@ -88,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
         except ConfigError as exc:
             log.error("%s", exc)
             return 1
-        print(f"Wrote {path}")
+        print(_("svc.wrote", path=path))
         return 0
 
     try:
@@ -98,16 +99,19 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.check:
-        print(f"Configuration OK ({config.source_path or 'built-in defaults'})")
-        print(f"  name            {config.name}")
-        print(f"  listen          {config.http.bind}:{config.http.port}")
-        print(f"  allowed         {', '.join(str(n) for n in config.http.allowed_networks)}")
-        print(f"  capabilities    {', '.join(config.capabilities)}")
-        print(f"  wake targets    {len(config.wake_targets)}")
+        print(_("svc.configOk", source=config.source_path or _("svc.defaults")))
+        print(f"  {_('svc.name'):<15} {config.name}")
+        print(f"  {_('svc.listen'):<15} {config.http.bind}:{config.http.port}")
+        print(
+            f"  {_('svc.allowed'):<15} "
+            f"{', '.join(str(n) for n in config.http.allowed_networks)}"
+        )
+        print(f"  {_('svc.capabilities'):<15} {', '.join(config.capabilities)}")
+        print(f"  {_('svc.wakeTargets'):<15} {len(config.wake_targets)}")
         for target in config.wake_targets:
             print(f"    - {target.mac} via {target.broadcast}:{target.port} ({target.iface})")
-        print(f"  state dir       {config.state_dir}")
-        print(f"  control socket  {config_mod.control_socket_path()}")
+        print(f"  {_('svc.stateDir'):<15} {config.state_dir}")
+        print(f"  {_('svc.controlSocket'):<15} {config_mod.control_socket_path()}")
         return 0
 
     try:

@@ -1,5 +1,7 @@
 /** Wire types for protocol v1. Mirrors `docs/PROTOCOL.md` section 5. */
 
+import { t } from "@/i18n";
+
 export type ApiEnvelope<T> =
   | { ok: true; ts: number; data: T }
   | { ok: false; ts: number; error: { code: string; message: string } };
@@ -99,37 +101,44 @@ export class ApiError extends Error {
     this.status = status;
   }
 
-  /** A sentence to put in front of the user. */
+  /**
+   * A sentence to put in front of the user, in their language.
+   *
+   * Keyed on `code` rather than on the server's `message`: the codes are
+   * normative (PROTOCOL.md 4.1) and the message is not, so this stays correct
+   * against a service running any locale. Codes without a phrasing of their own
+   * fall through to the server's message, which is at least specific.
+   */
   get friendly(): string {
     switch (this.code) {
       case "unreachable":
-        return "Can't reach this PC. Is it awake and on the same Wi-Fi?";
+        return t("error.unreachable");
       case "device_revoked":
-        return "This phone's access was revoked. Pair with the PC again.";
+        return t("error.device_revoked");
       case "unknown_device":
-        return "This PC doesn't recognise this phone. Pair again.";
+        return t("error.unknown_device");
       case "timestamp_out_of_window":
-        return "Your phone's clock is out of sync with the PC.";
+        return t("error.timestamp_out_of_window");
       case "no_session":
-        return "Nobody is logged in on that PC, so there's no session to unlock.";
+        return t("error.no_session");
       case "unlock_failed":
         return this.message;
       case "rate_limited":
-        return "Too many requests. Wait a moment and try again.";
+        return t("error.rate_limited");
       case "forbidden_network":
-        return "The PC refused this network. Connect to the same LAN.";
+        return t("error.forbidden_network");
       case "bad_server_signature":
       case "unsigned_response":
-        return "The reply wasn't signed by this PC. Someone may be impersonating it.";
+        return t("error.bad_signature");
       case "invalid_code":
-        return "That pairing code isn't right.";
+        return t("error.invalid_code");
       case "pairing_expired":
       case "pairing_disabled":
-        return "The pairing window closed. Run 'wol-unlockctl pair' on the PC again.";
+        return t("error.pairing_closed");
       case "pairing_denied":
-        return "The PC declined this device.";
+        return t("error.pairing_denied");
       case "pairing_timeout":
-        return "Nobody approved this device at the PC.";
+        return t("error.pairing_timeout");
       default:
         return this.message;
     }

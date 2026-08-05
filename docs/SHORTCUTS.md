@@ -11,7 +11,11 @@ Three App Intents, in the **app target**:
 Each takes a PC parameter backed by an `AppEntity`, so a shortcut reads
 "Wake *Desktop*" and defaults to the only paired PC. Siri phrases are registered
 through `AppShortcutsProvider`, so "Wake my PC with PC Unlock" works with no
-setup.
+setup — or "Разбуди мой ПК через PC Unlock" on a Russian device, from
+`locales/ios/ru.lproj/AppShortcuts.strings`. Titles and dialogue are localized
+too, and follow the **system** language rather than the app's own setting: iOS
+resolves them for the Shortcuts app without running the app. See
+[I18N.md](I18N.md).
 
 Put them anywhere iOS accepts a shortcut: a Home Screen icon, a Lock Screen
 button, a Control Center control, the Action Button, or a Siri phrase.

@@ -19,10 +19,18 @@ struct WakeControl: ControlWidget {
   var body: some ControlWidgetConfiguration {
     StaticControlConfiguration(kind: Self.kind) {
       ControlWidgetButton(action: WakePCIntent()) {
-        Label("Wake PC", systemImage: "power")
+        Label(
+          String(localized: "control.wake.label", defaultValue: "Wake PC"),
+          systemImage: "power"
+        )
       }
     }
-    .displayName("Wake PC")
-    .description("Send a Wake-on-LAN packet to your paired PC.")
+    .displayName(LocalizedStringResource("control.wake.title", defaultValue: "Wake PC"))
+    .description(
+      LocalizedStringResource(
+        "control.wake.description",
+        defaultValue: "Send a Wake-on-LAN packet to your paired PC."
+      )
+    )
   }
 }

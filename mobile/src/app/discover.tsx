@@ -18,6 +18,7 @@ import {
 } from "react-native";
 
 import { useDiscovery, type DiscoveredPC } from "@/discovery/useDiscovery";
+import { splitAround, useT } from "@/i18n";
 import { usePCStore } from "@/state/store";
 import { colors, spacing, styles as shared } from "@/ui/theme";
 
@@ -25,6 +26,8 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const { available, services, state, error } = useDiscovery(true);
   const pcs = usePCStore((store) => store.pcs);
+  const t = useT();
+  const [scanBefore, scanAfter] = splitAround(t("discover.scan.body"), "cmd");
 
   const pairedFingerprints = useMemo(
     () => new Set(pcs.map((pc) => pc.serverFp)),
@@ -33,7 +36,7 @@ export default function DiscoverScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Add a PC" }} />
+      <Stack.Screen options={{ title: t("nav.addPC") }} />
       <ScrollView style={shared.screen} contentContainerStyle={local.content}>
         {/* Plain Pressables rather than <Link asChild>: asChild clones the
             child with the Link's own props, which clobbers an array `style`
@@ -45,10 +48,11 @@ export default function DiscoverScreen() {
         >
           <Text style={local.cardGlyph}>📷</Text>
           <View style={local.grow}>
-            <Text style={shared.body}>Scan QR code</Text>
+            <Text style={shared.body}>{t("discover.scan.title")}</Text>
             <Text style={shared.caption}>
-              The fastest way. Run <Text style={shared.mono}>wol-unlockctl pair</Text> on the
-              PC.
+              {scanBefore}
+              <Text style={shared.mono}>wol-unlockctl pair</Text>
+              {scanAfter}
             </Text>
           </View>
         </Pressable>
@@ -58,28 +62,23 @@ export default function DiscoverScreen() {
           accessibilityRole="button"
           onPress={() => router.push("/pair")}
         >
-          <Text style={shared.body}>Enter details manually</Text>
-          <Text style={shared.caption}>
-            If the PC is on another subnet or discovery is blocked.
-          </Text>
+          <Text style={shared.body}>{t("discover.manual.title")}</Text>
+          <Text style={shared.caption}>{t("discover.manual.body")}</Text>
         </Pressable>
 
-        <Text style={local.sectionHeader}>ON THIS NETWORK</Text>
+        <Text style={local.sectionHeader}>{t("discover.section")}</Text>
 
         {!available ? (
           <View style={shared.card}>
-            <Text style={shared.body}>Discovery unavailable</Text>
-            <Text style={shared.caption}>
-              {error ??
-                "Bonjour browsing needs a development build. Use the QR code instead."}
-            </Text>
+            <Text style={shared.body}>{t("discover.unavailable.title")}</Text>
+            <Text style={shared.caption}>{error ?? t("discover.unavailable.body")}</Text>
           </View>
         ) : services.length === 0 ? (
           <View style={[shared.card, local.searching]}>
             {state === "failed" ? null : <ActivityIndicator />}
             <View style={local.grow}>
               <Text style={shared.body}>
-                {state === "failed" ? "Couldn't browse the network" : "Looking for PCs…"}
+                {state === "failed" ? t("discover.failed") : t("discover.looking")}
               </Text>
               {error ? <Text style={shared.caption}>{error}</Text> : null}
             </View>
@@ -105,10 +104,7 @@ export default function DiscoverScreen() {
           ))
         )}
 
-        <Text style={[shared.caption, local.footnote]}>
-          Discovered names and fingerprints are hints only. Pairing checks the PC's
-          identity against the code you enter before trusting it.
-        </Text>
+        <Text style={[shared.caption, local.footnote]}>{t("discover.footnote")}</Text>
       </ScrollView>
     </>
   );
@@ -123,19 +119,26 @@ function DiscoveredRow({
   alreadyPaired: boolean;
   onPress: () => void;
 }) {
+  const t = useT();
   return (
     <Pressable
       style={shared.card}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${service.displayName}${alreadyPaired ? ", already paired" : ""}`}
+      accessibilityLabel={
+        alreadyPaired
+          ? t("discover.a11y.alreadyPaired", { name: service.displayName })
+          : service.displayName
+      }
     >
       <View style={local.rowTop}>
         <Text style={shared.body}>{service.displayName}</Text>
         {alreadyPaired ? (
-          <Text style={[shared.caption, { color: colors.green }]}>Paired</Text>
+          <Text style={[shared.caption, { color: colors.green }]}>{t("discover.paired")}</Text>
         ) : service.pairingOpen ? (
-          <Text style={[shared.caption, { color: colors.tint }]}>Pairing open</Text>
+          <Text style={[shared.caption, { color: colors.tint }]}>
+            {t("discover.pairingOpen")}
+          </Text>
         ) : null}
       </View>
       <Text style={shared.caption}>{service.hostname}</Text>

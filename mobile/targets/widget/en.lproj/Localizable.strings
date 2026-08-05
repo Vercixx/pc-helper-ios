@@ -1,0 +1,35 @@
+/*
+  The widget extension's own strings.
+
+  An .appex is its own bundle, so these cannot live with the app's -- see the
+  note in StatusWidget.swift. Keys match the `String(localized:)` and
+  `LocalizedStringResource` calls in this directory.
+
+  Picked up without any Xcode wiring: @bacons/apple-targets adds this folder to
+  the target as a file-system-synchronized group, so everything in it is a
+  member by default.
+*/
+
+"entity.pc" = "PC";
+
+"intent.wake.title" = "Wake PC";
+"intent.wake.description" = "Sends a Wake-on-LAN magic packet to your paired PC.";
+"intent.wake.nothingSent" = "no packet could be sent";
+"intent.error.notPaired" = "No PC is paired yet. Open PC Unlock and pair one first.";
+"intent.error.wakeFailed" = "Couldn't send the wake packet: %@";
+
+"widget.notPaired" = "Not paired";
+"widget.asleep" = "Asleep";
+"widget.noUser" = "Nobody logged in";
+"widget.locked" = "Locked";
+"widget.unlocked" = "Unlocked";
+"widget.openApp" = "Open PC Unlock";
+"widget.cached" = "cached";
+"widget.cachedAt" = "cached · %@";
+"widget.wake" = "Wake";
+"widget.displayName" = "PC status";
+"widget.description" = "Whether your PC is awake and locked, with a button to wake it.";
+
+"control.wake.label" = "Wake PC";
+"control.wake.title" = "Wake PC";
+"control.wake.description" = "Send a Wake-on-LAN packet to your paired PC.";

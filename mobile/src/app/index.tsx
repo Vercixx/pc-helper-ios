@@ -18,6 +18,7 @@ import {
 } from "react-native";
 
 import { usePCActions } from "@/actions/usePCActions";
+import { splitAround, useT, type MessageKey } from "@/i18n";
 import { usePCStore } from "@/state/store";
 import type { LinkedPC, PCStatusSnapshot } from "@/state/types";
 import { colors, spacing, styles as shared } from "@/ui/theme";
@@ -29,14 +30,26 @@ export default function PCListScreen() {
   // less jarring than remounting them.
   const [generation, setGeneration] = useState(0);
   const router = useRouter();
+  const t = useT();
 
   return (
     <>
       <Stack.Screen
         options={{
+          title: t("nav.myPCs"),
+          headerLeft: () => (
+            <Pressable
+              accessibilityLabel={t("list.a11y.settings")}
+              accessibilityRole="button"
+              hitSlop={12}
+              onPress={() => router.push("/settings")}
+            >
+              <RNText style={local.headerGlyph}>⚙︎</RNText>
+            </Pressable>
+          ),
           headerRight: () => (
             <Pressable
-              accessibilityLabel="Add a PC"
+              accessibilityLabel={t("list.a11y.addPC")}
               accessibilityRole="button"
               hitSlop={12}
               onPress={() => router.push("/discover")}
@@ -74,13 +87,16 @@ export default function PCListScreen() {
 
 function EmptyState() {
   const router = useRouter();
+  const t = useT();
+  const [before, after] = splitAround(t("list.empty.body"), "cmd");
   return (
     <View style={shared.centered}>
       <RNText style={local.emptyGlyph}>🖥️</RNText>
-      <RNText style={shared.title}>No PCs yet</RNText>
+      <RNText style={shared.title}>{t("list.empty.title")}</RNText>
       <RNText style={[shared.caption, local.centerText]}>
-        On your Linux PC run <RNText style={shared.mono}>wol-unlockctl pair</RNText>, then
-        tap ＋ to scan the code it shows.
+        {before}
+        <RNText style={shared.mono}>wol-unlockctl pair</RNText>
+        {after}
       </RNText>
       {/* Not <Link asChild>: it clones the child with its own props, which
           clobbers an array `style` and drops the button's background. */}
@@ -89,7 +105,7 @@ function EmptyState() {
         accessibilityRole="button"
         onPress={() => router.push("/discover")}
       >
-        <RNText style={shared.primaryButtonLabel}>Add a PC</RNText>
+        <RNText style={shared.primaryButtonLabel}>{t("nav.addPC")}</RNText>
       </Pressable>
     </View>
   );
@@ -111,6 +127,7 @@ function PCRow({
   generation: number;
 }) {
   const router = useRouter();
+  const t = useT();
   const { busy, feedback, refresh, refreshIfStale, wake, unlock } = usePCActions(pc);
 
   // Refresh whenever the list comes back into view, so what is shown is never
@@ -137,7 +154,7 @@ function PCRow({
 
   const canUnlock = pc.capabilities.includes("unlock");
   const canWake = pc.wake.macs.length > 0;
-  const subtitle = describe(pc, status, busy);
+  const subtitle = describe(pc, status, busy, t);
 
   return (
     <View style={local.rowWrapper}>
@@ -145,21 +162,21 @@ function PCRow({
         <ContextMenu>
           <ContextMenu.Items>
             {canWake ? (
-              <Button label="Wake up" systemImage="power" onPress={() => void wake()} />
+              <Button label={t("action.wake")} systemImage="power" onPress={() => void wake()} />
             ) : null}
             {canUnlock ? (
               <Button
-                label="Unlock session"
+                label={t("action.unlock")}
                 systemImage="lock.open"
                 onPress={() => void unlock()}
               />
             ) : null}
             <Button
-              label="Refresh"
+              label={t("action.refresh")}
               systemImage="arrow.clockwise"
               onPress={() => void refresh()}
             />
-            <Button label="Details" systemImage="info.circle" onPress={openDetails} />
+            <Button label={t("action.details")} systemImage="info.circle" onPress={openDetails} />
           </ContextMenu.Items>
 
           <ContextMenu.Trigger>
@@ -187,7 +204,7 @@ function PCRow({
         style={StyleSheet.absoluteFill}
         accessibilityRole="button"
         accessibilityLabel={`${pc.name}. ${subtitle}`}
-        accessibilityHint="Opens details. Long press for wake and unlock."
+        accessibilityHint={t("list.a11y.rowHint")}
         onPress={openDetails}
       />
 
@@ -226,14 +243,16 @@ function describe(
   pc: LinkedPC,
   status: PCStatusSnapshot | undefined,
   busy: string | null,
+  t: (key: MessageKey) => string,
 ): string {
-  if (busy === "wake") return "Waking…";
-  if (busy === "unlock") return "Unlocking…";
-  if (busy === "status") return "Checking…";
+  if (busy === "wake") return t("status.waking");
+  if (busy === "unlock") return t("status.unlocking");
+  if (busy === "status") return t("status.checking");
   if (!status) return pc.hostname;
-  if (!status.reachable) return status.error ?? "Asleep or unreachable";
-  if (status.locked === null) return "Online — nobody logged in";
-  return status.locked ? "Locked — long press to unlock" : "Unlocked";
+  // `status.error` arrives already translated -- ApiError.friendly does it.
+  if (!status.reachable) return status.error ?? t("status.asleep");
+  if (status.locked === null) return t("status.noUser");
+  return status.locked ? t("status.lockedHint") : t("status.unlocked");
 }
 
 const local = StyleSheet.create({
@@ -243,6 +262,7 @@ const local = StyleSheet.create({
   centerText: { textAlign: "center" },
   stretch: { alignSelf: "stretch", marginTop: spacing.lg },
   addButton: { fontSize: 28, color: colors.tint, lineHeight: 32 },
+  headerGlyph: { fontSize: 20, color: colors.tint, lineHeight: 32 },
   rowWrapper: {
     backgroundColor: colors.card,
     borderRadius: 16,

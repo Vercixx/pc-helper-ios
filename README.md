@@ -19,6 +19,7 @@ iPhone (Expo / SwiftUI)                      my-pc (systemd --user)
 | **Installing on a phone** | [`docs/SIDELOADING.md`](docs/SIDELOADING.md) — including the free-account route |
 | **Shortcuts & Siri** | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) — Wake / status / unlock as App Intents |
 | **Widgets** | [`docs/WIDGETS.md`](docs/WIDGETS.md) — WidgetKit and Control Center, pending an App Group that survives a sideload |
+| **Languages** | [`docs/I18N.md`](docs/I18N.md) — English and Russian, and why five catalogues rather than one |
 
 ---
 

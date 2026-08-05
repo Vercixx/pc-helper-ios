@@ -7,6 +7,7 @@ import contextlib
 from pathlib import Path
 from typing import Any
 
+from ..i18n import _
 from . import protocol as P
 
 
@@ -37,11 +38,7 @@ class ControlClient:
         try:
             reader, writer = await asyncio.open_unix_connection(str(path))
         except (FileNotFoundError, ConnectionRefusedError) as exc:
-            raise ControlError(
-                "not_running",
-                f"cannot reach the service at {path}. Is it running?\n"
-                f"  systemctl --user status wol-unlock",
-            ) from exc
+            raise ControlError("not_running", _("control.notRunning", path=path)) from exc
         return cls(reader, writer)
 
     async def _read_loop(self) -> None:
@@ -68,13 +65,13 @@ class ControlClient:
             for future in self._pending.values():
                 if not future.done():
                     future.set_exception(
-                        ControlError("connection_lost", "the service closed the connection")
+                        ControlError("connection_lost", _("control.lost"))
                     )
             self._pending.clear()
 
     async def call(self, command: str, timeout: float = 15.0, **args: Any) -> dict[str, Any]:
         if self._closed.is_set():
-            raise ControlError("connection_lost", "control connection is closed")
+            raise ControlError("connection_lost", _("control.closed"))
         self._next_id += 1
         request_id = self._next_id
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
@@ -86,7 +83,9 @@ class ControlClient:
             message = await asyncio.wait_for(future, timeout=timeout)
         except asyncio.TimeoutError:
             self._pending.pop(request_id, None)
-            raise ControlError("timeout", f"{command} timed out after {timeout:g}s") from None
+            raise ControlError(
+                "timeout", _("control.timeout", command=command, timeout=timeout)
+            ) from None
 
         if not message.get("ok"):
             err = message.get("error") or {}

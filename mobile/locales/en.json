@@ -1,0 +1,32 @@
+{
+  "CFBundleDisplayName": "PC Unlock",
+  "NSCameraUsageDescription": "Scan the pairing QR code shown on your PC.",
+  "NSFaceIDUsageDescription": "Face ID protects the key that unlocks your PC.",
+  "NSLocalNetworkUsageDescription": "PC Unlock finds your computer on this network and sends it wake and unlock commands. Without this permission it cannot reach your PC.",
+  "ios": {
+    "Localizable.strings": {
+      "\"entity.pc\"": "PC",
+      "\"intent.wake.title\"": "Wake PC",
+      "\"intent.wake.description\"": "Sends a Wake-on-LAN magic packet to a paired PC.",
+      "\"intent.wake.sent\"": "Sent a wake packet to %@.",
+      "\"intent.wake.sentUnicast\"": "Sent a wake packet to %@ (unicast only — iOS blocked broadcast).",
+      "\"intent.wake.nothingSent\"": "no packet could be sent",
+      "\"intent.status.title\"": "Get PC status",
+      "\"intent.status.description\"": "Asks a paired PC whether it is awake and whether its session is locked.",
+      "\"intent.status.locked\"": "%@ is locked.",
+      "\"intent.status.unlocked\"": "%@ is unlocked.",
+      "\"intent.status.noUser\"": "%@ is awake, but nobody is logged in.",
+      "\"intent.unlock.title\"": "Unlock PC session",
+      "\"intent.unlock.description\"": "Unlocks the desktop session on a paired PC. Requires unlocking this device first.",
+      "\"intent.unlock.done\"": "Unlocked %@.",
+      "\"intent.unlock.alreadyUnlocked\"": "%@ was already unlocked.",
+      "\"intent.failure\"": "%1$@: %2$@",
+      "\"intent.error.notPaired\"": "No PC is paired. Open PC Unlock and pair one first.",
+      "\"intent.error.cannotUnlock\"": "That PC doesn't offer unlocking.",
+      "\"intent.error.wakeFailed\"": "Couldn't send the wake packet: %@",
+      "\"shortcut.wake\"": "Wake PC",
+      "\"shortcut.status\"": "PC status",
+      "\"shortcut.unlock\"": "Unlock PC"
+    }
+  }
+}

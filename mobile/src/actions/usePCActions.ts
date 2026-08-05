@@ -12,6 +12,7 @@ import { resolveAndRemember } from "@/api/endpoint";
 import { ApiError } from "@/api/types";
 import { sendWakePackets, waitUntilAwake } from "@/actions/wake";
 import { confirmBiometrics, migrateToDeviceOnly } from "@/crypto/keys";
+import { t } from "@/i18n";
 import { usePCStore } from "@/state/store";
 import type { LinkedPC } from "@/state/types";
 
@@ -164,16 +165,15 @@ export function usePCActions(pc: LinkedPC | undefined) {
     try {
       const result = await sendWakePackets(target);
       if (result.packetsSent === 0) {
-        setFeedback({ tone: "error", message: result.error ?? "Could not send a magic packet." });
+        setFeedback({ tone: "error", message: result.error ?? t("wake.failed") });
         return;
       }
 
       setFeedback({
         tone: "info",
         message:
-          `Sent ${result.packetsSent} magic packet${result.packetsSent === 1 ? "" : "s"}. ` +
-          `Waiting for ${target.name}…` +
-          (result.broadcastBlocked ? " (iOS blocked broadcast; used its last known IP.)" : ""),
+          t("wake.sent", { count: result.packetsSent, name: target.name }) +
+          (result.broadcastBlocked ? t("wake.sent.broadcastBlocked") : ""),
       });
 
       // Confirm rather than assume: poll until the PC actually answers.
@@ -181,17 +181,17 @@ export function usePCActions(pc: LinkedPC | undefined) {
       if (controller.signal.aborted) return;
 
       if (awake) {
-        setFeedback({ tone: "success", message: `${target.name} is awake.` });
+        setFeedback({ tone: "success", message: t("wake.awake", { name: target.name }) });
         await refresh();
       } else {
         setFeedback({
           tone: "error",
           message: result.broadcastBlocked
-            ? `${target.name} didn't come online. Only a unicast packet could be sent, which ` +
-              `needs your router to still hold an ARP entry for ${target.lastIp ?? "its IP"}. ` +
-              `A DHCP reservation plus a static ARP entry makes that reliable.`
-            : `${target.name} didn't come online. The packet was sent, so check Wake-on-LAN ` +
-              `is enabled in its BIOS and NIC.`,
+            ? t("wake.noResponse.unicast", {
+                name: target.name,
+                ip: target.lastIp ?? t("wake.itsIp"),
+              })
+            : t("wake.noResponse", { name: target.name }),
         });
       }
     } catch (error) {
@@ -215,8 +215,8 @@ export function usePCActions(pc: LinkedPC | undefined) {
       // The one place biometrics are asked for. Unlocking a PC is the action
       // worth confirming; checking whether it is online is not.
       if (target.requireBiometricsForUnlock !== false) {
-        if (!(await confirmBiometrics(`Unlock ${target.name}`))) {
-          setFeedback({ tone: "error", message: "Cancelled." });
+        if (!(await confirmBiometrics(t("unlock.prompt", { name: target.name })))) {
+          setFeedback({ tone: "error", message: t("unlock.cancelled") });
           return;
         }
       }
@@ -226,8 +226,8 @@ export function usePCActions(pc: LinkedPC | undefined) {
       setFeedback({
         tone: "success",
         message: result.was_locked
-          ? `Unlocked session ${result.session_id}.`
-          : `${target.name} was already unlocked.`,
+          ? t("unlock.done", { id: result.session_id })
+          : t("unlock.alreadyUnlocked", { name: target.name }),
       });
       setStatus(target.id, {
         reachable: true,

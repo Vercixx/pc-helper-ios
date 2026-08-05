@@ -16,15 +16,18 @@
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text } from "react-native";
 
+import { useT } from "@/i18n";
+
 import { colors } from "./theme";
 
-export function ModalCloseButton({ label = "Cancel" }: { label?: string }) {
+export function ModalCloseButton({ label }: { label?: string }) {
   const router = useRouter();
+  const t = useT();
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={label ?? t("common.cancel")}
       hitSlop={12}
       style={styles.button}
       // `back()` returns to whatever presented this sheet -- the list, or the

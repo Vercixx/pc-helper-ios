@@ -28,6 +28,7 @@ import { getLanDiscovery, isLanDiscoveryAvailable } from "@modules/lan-discovery
 
 import { fetchServerInfo } from "@/api/client";
 import { candidateEndpoints } from "@/api/endpoint";
+import { t } from "@/i18n";
 import type { LinkedPC } from "@/state/types";
 
 export type WakeOutcome = {
@@ -92,7 +93,7 @@ export async function sendWakePackets(pc: LinkedPC): Promise<WakeOutcome> {
       destinations: [],
       awake: null,
       broadcastBlocked: false,
-      error: "Wake-on-LAN needs a development build — Expo Go cannot open a UDP socket.",
+      error: t("wake.needsDevBuild"),
     };
   }
 
@@ -102,7 +103,7 @@ export async function sendWakePackets(pc: LinkedPC): Promise<WakeOutcome> {
       destinations: [],
       awake: null,
       broadcastBlocked: false,
-      error: "This PC reported no MAC addresses to wake.",
+      error: t("wake.noMacs"),
     };
   }
 
@@ -157,10 +158,7 @@ export async function sendWakePackets(pc: LinkedPC): Promise<WakeOutcome> {
       destinations: [],
       awake: null,
       broadcastBlocked,
-      error: permissionDenied
-        ? "iOS blocked the broadcast, and no unicast address is known for this PC yet. " +
-          "Open it once while it's awake so its IP is recorded, then try again."
-        : (lastError ?? "no magic packet could be sent"),
+      error: permissionDenied ? t("wake.noUnicastKnown") : (lastError ?? t("wake.nothingSent")),
     };
   }
 

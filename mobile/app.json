@@ -35,6 +35,10 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "locales": {
+      "en": "./locales/en.json",
+      "ru": "./locales/ru.json"
+    },
     "plugins": [
       [
         "expo-router",
@@ -57,7 +61,9 @@
       ],
       "expo-local-authentication",
       "@bacons/apple-targets",
-      "./plugins/withAppIntents"
+      "./plugins/withAppIntents",
+      "expo-localization",
+      "./plugins/withAppShortcutsStrings"
     ],
     "experiments": {
       "typedRoutes": true

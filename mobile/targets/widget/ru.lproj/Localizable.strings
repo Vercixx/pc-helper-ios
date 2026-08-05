@@ -1,0 +1,30 @@
+/*
+  Russian strings for the widget extension. See en.lproj/Localizable.strings.
+
+  These follow the *system* language, not the app's in-app override: WidgetKit
+  renders the widget in its own process, usually while the app is not running.
+*/
+
+"entity.pc" = "ПК";
+
+"intent.wake.title" = "Разбудить ПК";
+"intent.wake.description" = "Отправляет magic-пакет Wake-on-LAN сопряжённому ПК.";
+"intent.wake.nothingSent" = "не удалось отправить пакет";
+"intent.error.notPaired" = "Пока нет сопряжённых ПК. Откройте PC Unlock и выполните сопряжение.";
+"intent.error.wakeFailed" = "Не удалось отправить пакет пробуждения: %@";
+
+"widget.notPaired" = "Не сопряжён";
+"widget.asleep" = "Спит";
+"widget.noUser" = "Никто не вошёл";
+"widget.locked" = "Заблокирован";
+"widget.unlocked" = "Разблокирован";
+"widget.openApp" = "Откройте PC Unlock";
+"widget.cached" = "из кэша";
+"widget.cachedAt" = "из кэша · %@";
+"widget.wake" = "Разбудить";
+"widget.displayName" = "Состояние ПК";
+"widget.description" = "Включён ли ваш ПК и заблокирован ли он, с кнопкой пробуждения.";
+
+"control.wake.label" = "Разбудить ПК";
+"control.wake.title" = "Разбудить ПК";
+"control.wake.description" = "Отправить пакет Wake-on-LAN сопряжённому ПК.";

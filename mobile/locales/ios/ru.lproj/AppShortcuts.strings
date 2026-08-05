@@ -1,0 +1,13 @@
+/*
+  Russian Siri phrases. Keys are the English originals; see en.lproj.
+
+  Each phrase has to survive being spoken, so these are imperative and short,
+  and every one keeps the ${applicationName} token Siri uses to disambiguate
+  between apps that offer similar shortcuts.
+*/
+
+"Wake my PC with ${applicationName}" = "Разбуди мой ПК через ${applicationName}";
+"Wake my computer with ${applicationName}" = "Разбуди мой компьютер через ${applicationName}";
+"Check my PC with ${applicationName}" = "Проверь мой ПК через ${applicationName}";
+"Is my PC awake in ${applicationName}" = "Мой ПК включён, ${applicationName}";
+"Unlock my PC with ${applicationName}" = "Разблокируй мой ПК через ${applicationName}";

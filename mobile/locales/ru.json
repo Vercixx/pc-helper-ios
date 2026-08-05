@@ -1,0 +1,32 @@
+{
+  "CFBundleDisplayName": "PC Unlock",
+  "NSCameraUsageDescription": "Отсканируйте QR-код сопряжения, показанный на ПК.",
+  "NSFaceIDUsageDescription": "Face ID защищает ключ, которым разблокируется ваш ПК.",
+  "NSLocalNetworkUsageDescription": "PC Unlock находит ваш компьютер в этой сети и отправляет ему команды пробуждения и разблокировки. Без этого разрешения он не сможет связаться с ПК.",
+  "ios": {
+    "Localizable.strings": {
+      "\"entity.pc\"": "ПК",
+      "\"intent.wake.title\"": "Разбудить ПК",
+      "\"intent.wake.description\"": "Отправляет magic-пакет Wake-on-LAN сопряжённому ПК.",
+      "\"intent.wake.sent\"": "Пакет пробуждения отправлен на %@.",
+      "\"intent.wake.sentUnicast\"": "Пакет пробуждения отправлен на %@ (только одноадресный — iOS заблокировал широковещание).",
+      "\"intent.wake.nothingSent\"": "не удалось отправить пакет",
+      "\"intent.status.title\"": "Узнать состояние ПК",
+      "\"intent.status.description\"": "Спрашивает сопряжённый ПК, включён ли он и заблокирован ли его сеанс.",
+      "\"intent.status.locked\"": "%@ заблокирован.",
+      "\"intent.status.unlocked\"": "%@ разблокирован.",
+      "\"intent.status.noUser\"": "%@ включён, но никто не вошёл.",
+      "\"intent.unlock.title\"": "Разблокировать сеанс ПК",
+      "\"intent.unlock.description\"": "Разблокирует сеанс рабочего стола на сопряжённом ПК. Сначала нужно разблокировать это устройство.",
+      "\"intent.unlock.done\"": "%@ разблокирован.",
+      "\"intent.unlock.alreadyUnlocked\"": "%@ уже был разблокирован.",
+      "\"intent.failure\"": "%1$@: %2$@",
+      "\"intent.error.notPaired\"": "Нет сопряжённых ПК. Откройте PC Unlock и выполните сопряжение.",
+      "\"intent.error.cannotUnlock\"": "Этот ПК не поддерживает разблокировку.",
+      "\"intent.error.wakeFailed\"": "Не удалось отправить пакет пробуждения: %@",
+      "\"shortcut.wake\"": "Разбудить ПК",
+      "\"shortcut.status\"": "Состояние ПК",
+      "\"shortcut.unlock\"": "Разблокировать ПК"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+/*
+  Siri phrases for the App Shortcuts in native/WUAppIntents.swift.
+
+  Keyed by the English phrase *verbatim*, `${applicationName}` token included --
+  that is the contract Apple defines for this file, and it is why these cannot
+  be `LocalizedStringResource`s: Siri needs a phrase in every language at once,
+  not the one the device is set to.
+
+  Copied into the app target by plugins/withAppShortcutsStrings.js.
+*/
+
+"Wake my PC with ${applicationName}" = "Wake my PC with ${applicationName}";
+"Wake my computer with ${applicationName}" = "Wake my computer with ${applicationName}";
+"Check my PC with ${applicationName}" = "Check my PC with ${applicationName}";
+"Is my PC awake in ${applicationName}" = "Is my PC awake in ${applicationName}";
+"Unlock my PC with ${applicationName}" = "Unlock my PC with ${applicationName}";
