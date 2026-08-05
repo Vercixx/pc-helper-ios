@@ -68,11 +68,21 @@ jobs:
           echo "scheme=$scheme"       >> "$GITHUB_OUTPUT"
           echo "Building scheme '$scheme' from '$workspace'"
 
+      - name: Resolve Swift package dependencies
+        # Done as its own step so a package-resolution failure is reported
+        # plainly, instead of being interleaved into the build log where
+        # xcodebuild prints the reason on continuation lines a formatter drops.
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -workspace "${{ steps.xcode.outputs.workspace }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
+            -derivedDataPath build
+
       - name: Build unsigned .app
         run: |
           set -o pipefail
-          # Pipe through xcbeautify when available, but never let a missing
-          # formatter mask the build's own exit status.
+          # Always keep the raw log: xcbeautify is good to read but discards the
+          # continuation lines that carry xcodebuild's actual diagnostics.
           formatter=cat
           command -v xcbeautify >/dev/null && formatter=xcbeautify
           xcodebuild \
@@ -87,7 +97,18 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="" \
             build \
-            | "$formatter"
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | "$formatter"
+
+      - name: Show raw build diagnostics
+        if: failure()
+        run: |
+          echo "::group::errors"
+          grep -nE "error:|Could not resolve|cannot find|no such module" \
+            "$RUNNER_TEMP/xcodebuild.log" | head -60 || true
+          echo "::endgroup::"
+          echo "::group::last 200 raw lines"
+          tail -200 "$RUNNER_TEMP/xcodebuild.log" || true
+          echo "::endgroup::"
 
       - name: Package as .ipa
         # An .ipa is just a zip with the .app inside a top-level Payload/ folder.
