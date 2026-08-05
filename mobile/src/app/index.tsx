@@ -6,7 +6,7 @@
 import { Button, ContextMenu, HStack, Host, Image, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import { font, foregroundColor, frame, padding } from "@expo/ui/swift-ui/modifiers";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -25,7 +25,9 @@ import { colors, spacing, styles as shared } from "@/ui/theme";
 export default function PCListScreen() {
   const pcs = usePCStore((state) => state.pcs);
   const statuses = usePCStore((state) => state.statuses);
-  const [nonce, setNonce] = useState(0);
+  // Bumped by pull-to-refresh. Rows watch it and re-poll, which is cheaper and
+  // less jarring than remounting them.
+  const [generation, setGeneration] = useState(0);
   const router = useRouter();
 
   return (
@@ -50,14 +52,19 @@ export default function PCListScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={pcs.length === 0 ? local.emptyContainer : local.list}
         refreshControl={
-          <RefreshControl refreshing={false} onRefresh={() => setNonce((n) => n + 1)} />
+          <RefreshControl refreshing={false} onRefresh={() => setGeneration((n) => n + 1)} />
         }
       >
         {pcs.length === 0 ? (
           <EmptyState />
         ) : (
           pcs.map((pc) => (
-            <PCRow key={`${pc.id}:${nonce}`} pc={pc} status={statuses[pc.id]} />
+            <PCRow
+              key={pc.id}
+              pc={pc}
+              status={statuses[pc.id]}
+              generation={generation}
+            />
           ))
         )}
       </ScrollView>
@@ -94,17 +101,34 @@ function EmptyState() {
  * The row is a SwiftUI `ContextMenu`, so a long press produces the real iOS menu
  * with its blur and preview rather than a modal imitation of one.
  */
-function PCRow({ pc, status }: { pc: LinkedPC; status: PCStatusSnapshot | undefined }) {
+function PCRow({
+  pc,
+  status,
+  generation,
+}: {
+  pc: LinkedPC;
+  status: PCStatusSnapshot | undefined;
+  generation: number;
+}) {
   const router = useRouter();
-  const { busy, feedback, refresh, wake, unlock } = usePCActions(pc);
+  const { busy, feedback, refresh, refreshIfStale, wake, unlock } = usePCActions(pc);
 
   // Refresh whenever the list comes back into view, so what is shown is never
-  // left over from a previous app session.
+  // left over from a previous app session. Throttled: returning from the detail
+  // screen, which just polled, should not poll again.
   useFocusEffect(
     useCallback(() => {
-      void refresh();
-    }, [refresh]),
+      refreshIfStale();
+    }, [refreshIfStale]),
   );
+
+  // Pull-to-refresh means "I don't believe you", so it bypasses the throttle.
+  const seenGeneration = useRef(generation);
+  useEffect(() => {
+    if (generation === seenGeneration.current) return;
+    seenGeneration.current = generation;
+    void refresh();
+  }, [generation, refresh]);
 
   const openDetails = useCallback(
     () => router.push({ pathname: "/pc/[id]", params: { id: pc.id } }),

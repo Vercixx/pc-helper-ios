@@ -46,10 +46,23 @@ export const usePCStore = create<PCStore>()(
           return { pcs: next };
         }),
 
+      // Returns the state object unchanged when the patch changes nothing.
+      // Zustand short-circuits on identity, so no subscriber is notified and no
+      // `LinkedPC` gets a new identity -- which matters because effects keyed on
+      // that identity would otherwise re-run for a write that said nothing.
       updatePC: (id, patch) =>
-        set((state) => ({
-          pcs: state.pcs.map((pc) => (pc.id === id ? { ...pc, ...patch } : pc)),
-        })),
+        set((state) => {
+          const index = state.pcs.findIndex((pc) => pc.id === id);
+          const existing = state.pcs[index];
+          if (!existing) return state;
+
+          const keys = Object.keys(patch) as (keyof LinkedPC)[];
+          if (keys.every((key) => Object.is(existing[key], patch[key]))) return state;
+
+          const pcs = [...state.pcs];
+          pcs[index] = { ...existing, ...patch };
+          return { pcs };
+        }),
 
       renamePC: (id, name) =>
         set((state) => ({

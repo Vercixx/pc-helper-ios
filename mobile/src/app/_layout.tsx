@@ -2,6 +2,11 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from "react-native";
 
+import { ModalCloseButton } from "@/ui/ModalCloseButton";
+
+/** Sheets need an explicit way out; the navigator gives them no back button. */
+const dismissable = { headerLeft: () => <ModalCloseButton /> };
+
 export default function RootLayout() {
   const scheme = useColorScheme();
   // Without this the navigation header keeps React Navigation's light theme
@@ -16,11 +21,21 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: "My PCs" }} />
         <Stack.Screen
           name="discover"
-          options={{ title: "Add a PC", presentation: "modal", headerLargeTitle: false }}
+          options={{
+            title: "Add a PC",
+            presentation: "modal",
+            headerLargeTitle: false,
+            ...dismissable,
+          }}
         />
         <Stack.Screen
           name="pair"
-          options={{ title: "Pair", presentation: "modal", headerLargeTitle: false }}
+          options={{
+            title: "Pair",
+            presentation: "modal",
+            headerLargeTitle: false,
+            ...dismissable,
+          }}
         />
         <Stack.Screen
           name="scan"
@@ -28,6 +43,7 @@ export default function RootLayout() {
             title: "Scan QR code",
             presentation: "fullScreenModal",
             headerLargeTitle: false,
+            ...dismissable,
           }}
         />
         <Stack.Screen name="pc/[id]" options={{ title: "", headerLargeTitle: false }} />

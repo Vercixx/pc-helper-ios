@@ -28,6 +28,8 @@ export default function PCDetailScreen() {
 
   const { busy, feedback, refresh, wake, unlock } = usePCActions(pc);
 
+  // Once, on entry. `refresh` keeps a stable identity for as long as this PC is
+  // the one on screen, so this is a mount effect and not a poll loop.
   useEffect(() => {
     void refresh();
   }, [refresh]);
