@@ -20,6 +20,12 @@ on:
 permissions:
   contents: read
 
+# A macOS runner is expensive to leave spinning; if a newer run starts, the
+# older one has nothing useful left to produce.
+concurrency:
+  group: ios-unsigned-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     # Pinned rather than macos-latest: a runner image bump that changes the
