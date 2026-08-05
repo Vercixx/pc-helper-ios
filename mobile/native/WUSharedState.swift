@@ -21,7 +21,8 @@
 import Foundation
 
 enum SharedState {
-  static let appGroup = "group.com.vercixx.wolunlock"
+  /// Discovered, never hardcoded -- see WUEntitlements.swift.
+  static var appGroup: String { Entitlements.sharedAppGroup() }
   static let stateKey = "wolunlock.state"
   /// Relative to the app's Documents directory. Matches `STATE_FILE` in
   /// `src/state/widgetBridge.ts`.

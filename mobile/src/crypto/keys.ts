@@ -29,6 +29,8 @@ import * as Crypto from "expo-crypto";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
+import { sharedAppGroup } from "@modules/app-group";
+
 import {
   PUBKEY_BYTES,
   SEED_BYTES,
@@ -50,15 +52,21 @@ const KEY_PREFIX = "wolunlock.seed.";
  * Keychain access group shared with the widget extension.
  *
  * An App Group identifier is a legal keychain access group, and it is the right
- * one to use here: unlike `$(AppIdentifierPrefix)com.vercixx.wolunlock` it is a
- * literal the extension can name at compile time without knowing the team
- * prefix it was signed with.
+ * one to use here: unlike `$(AppIdentifierPrefix)com.vercixx.wolunlock` it does
+ * not depend on knowing the team prefix the build was signed with.
  *
- * Every write falls back to the app-private default if this is refused, which is
- * what happens when the entitlement did not survive signing. The app then works
- * exactly as before and only the widget's live status is lost.
+ * Discovered at runtime, not hardcoded. A re-signing tool rewrites App Group
+ * identifiers to fit its own team -- SideStore appends the team ID -- and a
+ * keychain query naming a group this build does not hold is simply refused,
+ * silently.
+ *
+ * Null means no group was granted at all. Every write falls back to the
+ * app-private default in that case, so the app works exactly as before and only
+ * the widget's live status is lost.
  */
-const SHARED_ACCESS_GROUP = "group.com.vercixx.wolunlock";
+function sharedAccessGroup(): string | null {
+  return sharedAppGroup();
+}
 
 /**
  * How a seed is stored in the keychain.
@@ -108,7 +116,7 @@ async function writeSeed(
     await SecureStore.setItemAsync(
       storageKey(alias),
       encodedSeed,
-      optionsFor(mode, "", SHARED_ACCESS_GROUP),
+      optionsFor(mode, "", sharedAccessGroup() ?? undefined),
     );
     return "shared";
   } catch {
@@ -132,7 +140,7 @@ async function readSeed(
   try {
     const shared = await SecureStore.getItemAsync(
       storageKey(alias),
-      optionsFor(mode, prompt, SHARED_ACCESS_GROUP),
+      optionsFor(mode, prompt, sharedAccessGroup() ?? undefined),
     );
     if (shared) return shared;
   } catch {
@@ -146,7 +154,7 @@ async function readSeed(
     await SecureStore.setItemAsync(
       storageKey(alias),
       priv,
-      optionsFor("device-only", "", SHARED_ACCESS_GROUP),
+      optionsFor("device-only", "", sharedAccessGroup() ?? undefined),
     );
   } catch {
     /* Promotion is best-effort; the seed is still usable where it is. */
@@ -242,7 +250,7 @@ export async function deleteDeviceKey(alias: string): Promise<void> {
   // Both groups: a seed promoted to the shared group may have left the
   // app-private copy behind, and unpairing must not leave a usable key anywhere.
   for (const options of [
-    optionsFor("device-only", "", SHARED_ACCESS_GROUP),
+    optionsFor("device-only", "", sharedAccessGroup() ?? undefined),
     optionsFor("device-only", ""),
   ]) {
     try {

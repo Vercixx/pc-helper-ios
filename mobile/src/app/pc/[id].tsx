@@ -14,8 +14,11 @@ import {
   View,
 } from "react-native";
 
+import { appGroups, bundleIdentifier, sharedAppGroup } from "@modules/app-group";
+
 import { usePCActions } from "@/actions/usePCActions";
 import { usePCStore } from "@/state/store";
+import { isWidgetStorageWorking } from "@/state/widgetBridge";
 import { colors, spacing, styles as shared } from "@/ui/theme";
 
 export default function PCDetailScreen() {
@@ -135,6 +138,10 @@ export default function PCDetailScreen() {
           <Detail label="This device's ID" value={pc.deviceId} mono />
           <Detail label="PC fingerprint" value={pc.serverFp} mono />
           <Detail label="Paired" value={new Date(pc.pairedAt).toLocaleString()} />
+          {/* Whether widgets can work at all on this install. A re-signing tool
+              rewrites the App Group, so what matters is the identifier granted
+              at runtime, not the one in app.json. */}
+          <Detail label="Widget storage" value={widgetStorageSummary()} mono />
         </View>
 
         <Pressable style={[shared.card, local.destructive]} onPress={confirmUnpair}>
@@ -184,6 +191,16 @@ function Detail({ label, value, mono }: { label: string; value: string; mono?: b
       </Text>
     </View>
   );
+}
+
+/** One line saying whether shared storage is live, and under which identifier. */
+function widgetStorageSummary(): string {
+  const granted = appGroups();
+  if (granted.length === 0) {
+    return `no App Group granted\n${bundleIdentifier() ?? "?"}`;
+  }
+  const chosen = sharedAppGroup() ?? granted[0]!;
+  return `${isWidgetStorageWorking() ? "ok" : "not writable"}\n${chosen}`;
 }
 
 function dotColor(reachable: boolean | undefined, locked: boolean | null | undefined): string {

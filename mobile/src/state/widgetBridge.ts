@@ -14,14 +14,12 @@
  */
 
 import { File, Paths } from "expo-file-system";
-import { Platform } from "react-native";
+
+import { publishToAppGroup } from "@modules/app-group";
 
 import { usePCStore } from "./store";
 import { buildWidgetPayload } from "./widgetPayload";
 
-export const APP_GROUP = "group.com.vercixx.wolunlock";
-/** Must match `SharedState.stateKey` in the native sources. */
-const STATE_KEY = "wolunlock.state";
 /** Must match `SharedState.stateFileName`. */
 const STATE_FILE = "wolunlock-state.json";
 
@@ -45,29 +43,23 @@ function writeStateFile(serialized: string): void {
 /**
  * The App Group path, for the widget extension.
  *
- * Loaded lazily and tolerated failing: `@bacons/apple-targets` is only present
- * while the widget target is enabled, and even then the entitlement may not
- * have survived signing.
+ * The identifier is discovered natively rather than hardcoded: a re-signing
+ * tool rewrites it, and addressing the wrong container fails silently.
  */
 function writeAppGroup(serialized: string): void {
-  if (Platform.OS !== "ios") return;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require("@bacons/apple-targets") as
-      | typeof import("@bacons/apple-targets")
-      | undefined;
-    if (!mod?.ExtensionStorage) return;
-    new mod.ExtensionStorage(APP_GROUP).set(STATE_KEY, serialized);
-    mod.ExtensionStorage.reloadWidget();
-    mod.ExtensionStorage.reloadControls();
-  } catch {
-    /* No App Group at runtime. Widgets are optional; the app is not. */
-  }
+  lastAppGroupWriteSucceeded = publishToAppGroup(serialized);
 }
 
 function write(serialized: string): void {
   writeStateFile(serialized);
   writeAppGroup(serialized);
+}
+
+let lastAppGroupWriteSucceeded = false;
+
+/** Whether the last publish reached the shared container. For diagnostics. */
+export function isWidgetStorageWorking(): boolean {
+  return lastAppGroupWriteSucceeded;
 }
 
 /**

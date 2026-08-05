@@ -52,7 +52,10 @@ enum DeviceKey {
   static func seed(alias: String) throws -> Data {
     let account = Data((keyPrefix + alias).utf8)
 
-    for group in [SharedState.appGroup, nil] as [String?] {
+    // Every group this build actually holds, then the app-private default.
+    var candidates: [String?] = Entitlements.appGroups().map { Optional($0) }
+    candidates.append(nil)
+    for group in candidates {
       var query: [String: Any] = [
         kSecClass as String: kSecClassGenericPassword,
         kSecAttrService as String: service,

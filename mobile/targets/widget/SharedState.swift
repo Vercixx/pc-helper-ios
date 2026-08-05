@@ -14,7 +14,9 @@
 import Foundation
 
 enum SharedState {
-  static let appGroup = "group.com.vercixx.wolunlock"
+  /// Discovered, never hardcoded -- see Entitlements.swift. The extension
+  /// is signed with its own profile, so it reads its own.
+  static var appGroup: String { Entitlements.sharedAppGroup() }
   static let stateKey = "wolunlock.state"
   static let currentVersion = 1
 
