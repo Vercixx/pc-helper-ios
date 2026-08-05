@@ -1,0 +1,116 @@
+name: Build unsigned iOS IPA
+
+# Produces a device-architecture .ipa with code signing disabled, for sideloading
+# with SideStore / AltStore / Sideloadly using a free Apple ID.
+#
+# Why this exists: EAS Build's `internal` distribution needs an ad-hoc
+# provisioning profile, which is a paid Developer Program feature. Building
+# unsigned sidesteps Apple's signing infrastructure entirely and defers signing
+# to the phone. See docs/SIDELOADING.md.
+#
+# macOS runners are free on public repositories; on private ones they bill at a
+# 10x minute multiplier, so this is set to run manually rather than on push.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Pinned rather than macos-latest: a runner image bump that changes the
+    # bundled Xcode should be a deliberate choice, not a surprise broken build.
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install JS dependencies
+        # The tree has a react-dom peer conflict that `expo install` already
+        # overrides; npm ci needs to be told the same thing.
+        run: npm ci --legacy-peer-deps
+
+      - name: Typecheck and test
+        run: |
+          npx tsc --noEmit
+          npx jest
+
+      - name: Generate the native iOS project
+        # Also runs pod install, which needs macOS.
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Resolve workspace and scheme
+        id: xcode
+        run: |
+          workspace="$(ls -d ios/*.xcworkspace | head -n1)"
+          scheme="$(basename "$workspace" .xcworkspace)"
+          echo "workspace=$workspace" >> "$GITHUB_OUTPUT"
+          echo "scheme=$scheme"       >> "$GITHUB_OUTPUT"
+          echo "Building scheme '$scheme' from '$workspace'"
+
+      - name: Build unsigned .app
+        run: |
+          set -o pipefail
+          # Pipe through xcbeautify when available, but never let a missing
+          # formatter mask the build's own exit status.
+          formatter=cat
+          command -v xcbeautify >/dev/null && formatter=xcbeautify
+          xcodebuild \
+            -workspace "${{ steps.xcode.outputs.workspace }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            build \
+            | "$formatter"
+
+      - name: Package as .ipa
+        # An .ipa is just a zip with the .app inside a top-level Payload/ folder.
+        run: |
+          app="$(ls -d build/Build/Products/Release-iphoneos/*.app | head -n1)"
+          echo "Packaging $app"
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$app" Payload/
+          zip -qry wol-unlock-unsigned.ipa Payload
+          rm -rf Payload
+          ls -lh wol-unlock-unsigned.ipa
+
+      - name: Verify the binary targets a device, not the simulator
+        # A simulator build would upload fine and then fail to install on the
+        # phone, so fail loudly here instead.
+        run: |
+          binary="$(find build/Build/Products/Release-iphoneos -maxdepth 2 -type f -perm +111 \
+            -not -name "*.dylib" | head -n1)"
+          echo "Inspecting $binary"
+          lipo -info "$binary"
+          if lipo -info "$binary" | grep -qi "x86_64"; then
+            echo "::error::binary contains x86_64 — this looks like a simulator build"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wol-unlock-unsigned-ipa
+          path: mobile/wol-unlock-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error

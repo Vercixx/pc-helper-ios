@@ -1,0 +1,68 @@
+[Unit]
+Description=Wake-on-LAN and logind session unlock service
+Documentation=file:%h/.local/share/wol-unlock/PROTOCOL.md
+# Ordering only, not a dependency: the service is useful before a graphical
+# session exists (status, wake relay) and must keep running while one is locked.
+After=graphical-session.target
+# A crash loop from a bad config should give up rather than spin forever.
+# These are [Unit] keys; systemd silently ignores them under [Service].
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/wol-unlock/venv/bin/wol-unlock
+Restart=on-failure
+RestartSec=5s
+Environment=PYTHONUNBUFFERED=1
+
+# --- Privilege ------------------------------------------------------------
+# Nothing here needs elevation. logind grants UnlockSession without consulting
+# polkit when the caller's uid matches the session's, which it does: this unit
+# runs as the user who owns the desktop session. No sudo, no setuid, no polkit
+# rule anywhere in this project.
+NoNewPrivileges=yes
+
+# --- Filesystem -----------------------------------------------------------
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/wol-unlock
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+ProtectHostname=yes
+ProtectClock=yes
+
+# --- Process --------------------------------------------------------------
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+
+# --- Network --------------------------------------------------------------
+# AF_NETLINK is required: interface enumeration (both ours and python-zeroconf's
+# via ifaddr) goes through it. AF_UNIX carries the control socket and D-Bus.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+# Makes "LAN only" a property the kernel enforces rather than a convention the
+# code follows. Narrow these to your actual subnet if you like.
+# Requires BPF cgroup support; systemd logs a warning and continues without it.
+IPAddressDeny=any
+IPAddressAllow=localhost
+IPAddressAllow=10.0.0.0/8
+IPAddressAllow=172.16.0.0/12
+IPAddressAllow=192.168.0.0/16
+IPAddressAllow=169.254.0.0/16
+IPAddressAllow=224.0.0.0/4
+
+[Install]
+WantedBy=default.target

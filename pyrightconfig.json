@@ -1,0 +1,8 @@
+{
+  "include": ["pc-service/src", "pc-service/tests"],
+  "extraPaths": ["pc-service/src"],
+  "venvPath": "pc-service",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic"
+}

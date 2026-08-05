@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "PC Unlock",
+    "slug": "wol-unlock",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "wolunlock",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1020"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vercixx.wolunlock",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "PC Unlock finds your computer on this network and sends it wake and unlock commands. Without this permission it cannot reach your PC.",
+        "NSBonjourServices": ["_wol-unlock._tcp"],
+        "NSCameraUsageDescription": "Scan the pairing QR code shown on your PC.",
+        "NSFaceIDUsageDescription": "Face ID protects the key that unlocks your PC.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "./src/app"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan the pairing QR code shown on your PC.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Face ID protects the key that unlocks your PC."
+        }
+      ],
+      "expo-local-authentication"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "root": "./src/app"
+      },
+      "eas": {
+        "projectId": "b05e73fc-7cb0-4331-8b79-aaf3abe750dd"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b05e73fc-7cb0-4331-8b79-aaf3abe750dd"
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
+    }
+  }
+}
