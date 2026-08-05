@@ -53,7 +53,11 @@ export default function PCDetailScreen() {
           style: "destructive",
           onPress: async () => {
             await removePC(pc.id);
-            router.replace("/");
+            // `dismissTo`, not `replace`: the list is already at the bottom of
+            // this stack, and replacing pushes a *second* copy of it -- which
+            // is why the list came back wearing a "‹ My PCs" button pointing at
+            // itself. This pops back to the one that is already there.
+            router.dismissTo("/");
           },
         },
       ],

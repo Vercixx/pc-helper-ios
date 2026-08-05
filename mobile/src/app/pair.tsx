@@ -6,6 +6,7 @@
  * until somebody approves the device at the PC's own keyboard.
  */
 
+import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -79,7 +80,7 @@ export default function PairScreen() {
       }
 
       setPhase("waiting");
-      const { pc } = await pairWithPC({
+      await pairWithPC({
         endpoint,
         code: normalizeCode(code),
         expectedFingerprint: expected,
@@ -88,7 +89,11 @@ export default function PairScreen() {
       });
 
       setPhase("done");
-      router.replace({ pathname: "/pc/[id]", params: { id: pc.id } });
+      // Land on the list, where the new PC is now a row, rather than pushing
+      // its detail screen on top of the pairing sheet. The haptic stands in for
+      // the confirmation that screen used to provide.
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.dismissTo("/");
     } catch (cause) {
       setPhase("form");
       setError(cause instanceof ApiError ? cause.friendly : String(cause));
