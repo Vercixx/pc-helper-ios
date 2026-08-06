@@ -28,13 +28,14 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Pressable, StyleSheet, Text as RNText, type ColorValue } from "react-native";
+import type { ColorValue } from "react-native";
 
 import { usePCActions } from "@/actions/usePCActions";
 import { useT, type MessageKey } from "@/i18n";
 import { usePCStore } from "@/state/store";
 import type { LinkedPC, PCStatusSnapshot } from "@/state/types";
 import { PAIR_COMMAND } from "@/ui/copy";
+import { HeaderButton } from "@/ui/HeaderButton";
 import { Screen } from "@/ui/Screen";
 import { statusColor, statusSymbol } from "@/ui/status";
 import { colors, secondaryText, tertiaryText } from "@/ui/theme";
@@ -72,24 +73,18 @@ export default function PCListScreen() {
         options={{
           title: t("nav.myPCs"),
           headerLeft: () => (
-            <Pressable
-              accessibilityLabel={t("list.a11y.settings")}
-              accessibilityRole="button"
-              hitSlop={12}
+            <HeaderButton
+              symbol="gear"
+              label={t("list.a11y.settings")}
               onPress={() => router.push("/settings")}
-            >
-              <RNText style={local.headerGlyph}>⚙︎</RNText>
-            </Pressable>
+            />
           ),
           headerRight: () => (
-            <Pressable
-              accessibilityLabel={t("list.a11y.addPC")}
-              accessibilityRole="button"
-              hitSlop={12}
+            <HeaderButton
+              symbol="plus"
+              label={t("list.a11y.addPC")}
               onPress={() => router.push("/discover")}
-            >
-              <RNText style={local.addButton}>＋</RNText>
-            </Pressable>
+            />
           ),
         }}
       />
@@ -260,8 +255,3 @@ function describe(
   if (status.locked === null) return t("status.noUser");
   return status.locked ? t("status.lockedHint") : t("status.unlocked");
 }
-
-const local = StyleSheet.create({
-  addButton: { fontSize: 28, color: colors.tint, lineHeight: 32 },
-  headerGlyph: { fontSize: 20, color: colors.tint, lineHeight: 32 },
-});
