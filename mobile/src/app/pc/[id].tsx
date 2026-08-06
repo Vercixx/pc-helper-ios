@@ -1,18 +1,41 @@
 /**
- * Detail screen: status, the two actions as full-width buttons, and unpairing.
+ * Detail screen: status, the two actions, and unpairing.
+ *
+ * The actions sit in a `GlassEffectContainer` so the three capsules blend into
+ * one another the way iOS 26 draws a grouped control cluster. Their section has
+ * a clear row background -- glass over a form row's own material reads as a
+ * smudge, not as glass.
  */
 
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
+  Button,
+  Form,
+  HStack,
+  Image,
+  LabeledContent,
+  Namespace,
+  Section,
+  Spacer,
   Text,
-  View,
-} from "react-native";
+  VStack,
+  GlassEffectContainer,
+} from "@expo/ui/swift-ui";
+import {
+  buttonBorderShape,
+  buttonStyle,
+  controlSize,
+  disabled as disabledModifier,
+  font,
+  foregroundStyle,
+  glassEffectId,
+  lineLimit,
+  listRowBackground,
+  symbolEffect,
+  textSelection,
+} from "@expo/ui/swift-ui/modifiers";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useId } from "react";
+import { Alert } from "react-native";
 
 import {
   appGroups,
@@ -25,14 +48,18 @@ import {
 import { usePCActions } from "@/actions/usePCActions";
 import { useLocale, useT, type MessageKey } from "@/i18n";
 import { usePCStore } from "@/state/store";
+import type { PCStatusSnapshot } from "@/state/types";
 import { isWidgetStorageWorking } from "@/state/widgetBridge";
-import { colors, spacing, styles as shared } from "@/ui/theme";
+import { Screen } from "@/ui/Screen";
+import { statusColor, statusSymbol } from "@/ui/status";
+import { secondaryText } from "@/ui/theme";
 
 export default function PCDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const t = useT();
   const locale = useLocale();
+  const glassNamespace = useId();
 
   const pc = usePCStore(useCallback((state) => state.pcs.find((item) => item.id === id), [id]));
   const status = usePCStore(useCallback((state) => (id ? state.statuses[id] : undefined), [id]));
@@ -48,9 +75,11 @@ export default function PCDetailScreen() {
 
   if (!pc) {
     return (
-      <View style={shared.centered}>
-        <Text style={shared.body}>{t("detail.gone")}</Text>
-      </View>
+      <Screen>
+        <VStack>
+          <Text>{t("detail.gone")}</Text>
+        </VStack>
+      </Screen>
     );
   }
 
@@ -77,139 +106,183 @@ export default function PCDetailScreen() {
 
   const canWake = pc.wake.macs.length > 0;
   const canUnlock = pc.capabilities.includes("unlock");
+  const anyBusy = busy !== null;
 
   return (
     <>
       <Stack.Screen options={{ title: pc.name }} />
-      <ScrollView style={shared.screen} contentContainerStyle={local.content}>
-        <View style={shared.card}>
-          <View style={local.statusRow}>
-            <View style={[local.dot, { backgroundColor: dotColor(status?.reachable, status?.locked) }]} />
-            <Text style={shared.body}>{headline(status, busy, t)}</Text>
-            {busy === "status" ? <ActivityIndicator size="small" /> : null}
-          </View>
-          {status?.error ? <Text style={shared.caption}>{status.error}</Text> : null}
-          {status?.sessionId ? (
-            <Text style={shared.caption}>
-              {t("detail.session", { id: status.sessionId })}
-              {status.desktop ? ` · ${status.desktop}` : ""}
-            </Text>
-          ) : null}
-        </View>
+      <Screen>
+        <Form>
+          <Section>
+            <HStack spacing={12}>
+              <Image
+                systemName={statusSymbol(status)}
+                size={28}
+                color={statusColor(status)}
+                // Only while something is in flight: swapping the modifier in
+                // and out is what starts and stops the animation, so no
+                // observable state has to be bridged for it.
+                modifiers={
+                  anyBusy
+                    ? [symbolEffect({ effect: "pulse" }, { options: { repeat: "continuous" } })]
+                    : []
+                }
+              />
+              <VStack alignment="leading" spacing={2}>
+                <Text modifiers={[font({ size: 17 })]}>{headline(status, busy, t)}</Text>
+                {status?.error ? (
+                  <Text modifiers={[font({ size: 13 }), secondaryText]}>
+                    {status.error}
+                  </Text>
+                ) : null}
+                {status?.sessionId ? (
+                  <Text modifiers={[font({ size: 13 }), secondaryText]}>
+                    {t("detail.session", { id: status.sessionId })}
+                    {status.desktop ? ` · ${status.desktop}` : ""}
+                  </Text>
+                ) : null}
+              </VStack>
+              <Spacer />
+            </HStack>
+          </Section>
 
-        {feedback ? (
-          <View style={shared.card}>
-            <Text
-              style={
-                feedback.tone === "error"
-                  ? { color: colors.red }
-                  : feedback.tone === "success"
-                    ? { color: colors.green }
-                    : shared.body
-              }
-            >
-              {feedback.message}
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={local.actions}>
-          <ActionButton
-            label={busy === "wake" ? t("status.waking") : t("action.wake")}
-            disabled={!canWake || busy !== null}
-            onPress={() => void wake()}
-          />
-          <ActionButton
-            label={busy === "unlock" ? t("status.unlocking") : t("action.unlock")}
-            disabled={!canUnlock || busy !== null}
-            onPress={() => void unlock()}
-          />
-          <ActionButton
-            label={t("action.refresh")}
-            secondary
-            disabled={busy !== null}
-            onPress={() => void refresh()}
-          />
-        </View>
-
-        <View style={shared.card}>
-          <Detail label={t("detail.address")} value={`${pc.hostname}:${pc.port}`} />
-          {pc.lastIp ? <Detail label={t("detail.lastIp")} value={pc.lastIp} /> : null}
-          <Detail
-            label={t("detail.capabilities")}
-            value={pc.capabilities.join(", ") || t("common.none")}
-          />
-          <Detail
-            label={t("detail.wakeTargets")}
-            value={pc.wake.macs.length > 0 ? pc.wake.macs.join("\n") : t("detail.noTargets")}
-          />
-          <Detail
-            label={t("detail.unlockConfirmation")}
-            value={
-              pc.requireBiometricsForUnlock === false
-                ? t("detail.confirmNone")
-                : t("detail.confirmBiometric")
+          <Section
+            footer={
+              feedback ? (
+                <Text modifiers={[foregroundStyle(feedbackColor(feedback.tone))]}>
+                  {feedback.message}
+                </Text>
+              ) : undefined
             }
-          />
-          <Detail label={t("detail.deviceId")} value={pc.deviceId} mono />
-          <Detail label={t("detail.fingerprint")} value={pc.serverFp} mono />
-          <Detail
-            label={t("detail.pairedAt")}
-            value={new Date(pc.pairedAt).toLocaleString(locale)}
-          />
-          {/* Whether widgets can work at all on this install. A re-signing tool
-              rewrites the App Group, so what matters is the identifier granted
-              at runtime, not the one in app.json. */}
-          <Detail label={t("detail.widgetStorage")} value={widgetStorageSummary(t)} mono />
-        </View>
+            modifiers={[listRowBackground("clear")]}
+          >
+            <Namespace id={glassNamespace}>
+              <GlassEffectContainer spacing={12}>
+                <HStack spacing={12}>
+                  <Button
+                    label={busy === "wake" ? t("status.waking") : t("action.wake")}
+                    systemImage="power"
+                    onPress={() => void wake()}
+                    modifiers={[
+                      buttonStyle("glassProminent"),
+                      buttonBorderShape("capsule"),
+                      controlSize("large"),
+                      glassEffectId("wake", glassNamespace),
+                      disabledModifier(!canWake || anyBusy),
+                    ]}
+                  />
+                  <Button
+                    label={busy === "unlock" ? t("status.unlocking") : t("action.unlock")}
+                    systemImage="lock.open"
+                    onPress={() => void unlock()}
+                    modifiers={[
+                      buttonStyle("glass"),
+                      buttonBorderShape("capsule"),
+                      controlSize("large"),
+                      glassEffectId("unlock", glassNamespace),
+                      disabledModifier(!canUnlock || anyBusy),
+                    ]}
+                  />
+                  <Button
+                    label={t("action.refresh")}
+                    systemImage="arrow.clockwise"
+                    onPress={() => void refresh()}
+                    modifiers={[
+                      buttonStyle("glass"),
+                      buttonBorderShape("capsule"),
+                      controlSize("large"),
+                      glassEffectId("refresh", glassNamespace),
+                      disabledModifier(anyBusy),
+                    ]}
+                  />
+                </HStack>
+              </GlassEffectContainer>
+            </Namespace>
+          </Section>
 
-        <Pressable style={[shared.card, local.destructive]} onPress={confirmUnpair}>
-          <Text style={{ color: colors.red, fontSize: 17 }}>{t("detail.unpair")}</Text>
-        </Pressable>
-      </ScrollView>
+          <Section>
+            <Detail label={t("detail.address")} value={`${pc.hostname}:${pc.port}`} />
+            {pc.lastIp ? <Detail label={t("detail.lastIp")} value={pc.lastIp} /> : null}
+            <Detail
+              label={t("detail.capabilities")}
+              value={pc.capabilities.join(", ") || t("common.none")}
+            />
+            <Detail
+              label={t("detail.unlockConfirmation")}
+              value={
+                pc.requireBiometricsForUnlock === false
+                  ? t("detail.confirmNone")
+                  : t("detail.confirmBiometric")
+              }
+            />
+            <Detail
+              label={t("detail.pairedAt")}
+              value={new Date(pc.pairedAt).toLocaleString(locale)}
+            />
+            <StackedDetail
+              label={t("detail.wakeTargets")}
+              value={pc.wake.macs.length > 0 ? pc.wake.macs.join("\n") : t("detail.noTargets")}
+              mono={pc.wake.macs.length > 0}
+            />
+            <StackedDetail label={t("detail.deviceId")} value={pc.deviceId} mono />
+            <StackedDetail label={t("detail.fingerprint")} value={pc.serverFp} mono />
+            {/* Whether widgets can work at all on this install. A re-signing tool
+                rewrites the App Group, so what matters is the identifier granted
+                at runtime, not the one in app.json. */}
+            <StackedDetail label={t("detail.widgetStorage")} value={widgetStorageSummary(t)} mono />
+          </Section>
+
+          <Section>
+            <Button role="destructive" label={t("detail.unpair")} onPress={confirmUnpair} />
+          </Section>
+        </Form>
+      </Screen>
     </>
   );
 }
 
-function ActionButton({
-  label,
-  onPress,
-  disabled,
-  secondary,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  secondary?: boolean;
-}) {
+/** A short value, on the same line as its label -- the Form idiom. */
+function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: Boolean(disabled) }}
-      style={[
-        shared.primaryButton,
-        secondary ? local.secondaryButton : null,
-        disabled ? local.disabled : null,
-      ]}
-    >
-      <Text style={[shared.primaryButtonLabel, secondary ? { color: colors.tint } : null]}>
-        {label}
-      </Text>
-    </Pressable>
+    <LabeledContent label={label}>
+      <Text modifiers={[textSelection(true)]}>{value}</Text>
+    </LabeledContent>
   );
 }
 
-function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+/**
+ * A value too long to sit beside its label: fingerprints, device IDs, a list of
+ * MACs. Stacked, so it can wrap instead of being truncated to an ellipsis.
+ */
+function StackedDetail({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
   return (
-    <View style={local.detailRow}>
-      <Text style={shared.caption}>{label}</Text>
-      <Text style={mono ? shared.mono : shared.body} selectable>
+    <VStack alignment="leading" spacing={2}>
+      <Text modifiers={[font({ size: 13 }), secondaryText]}>{label}</Text>
+      <Text
+        modifiers={[
+          font(mono ? { size: 12, design: "monospaced" } : { size: 16 }),
+          lineLimit(),
+          textSelection(true),
+        ]}
+      >
         {value}
       </Text>
-    </View>
+    </VStack>
   );
+}
+
+function feedbackColor(tone: "success" | "error" | "info") {
+  if (tone === "error") return "red";
+  if (tone === "success") return "green";
+  return "secondary";
 }
 
 /**
@@ -237,14 +310,8 @@ function widgetStorageSummary(t: (key: MessageKey, params?: Record<string, strin
     : `${t("widget.noProfile")}\n${bundle}`;
 }
 
-function dotColor(reachable: boolean | undefined, locked: boolean | null | undefined): string {
-  if (reachable === undefined) return "#8E8E93";
-  if (!reachable) return "#8E8E93";
-  return locked ? "#FF9F0A" : "#30D158";
-}
-
 function headline(
-  status: { reachable: boolean; locked: boolean | null } | undefined,
+  status: PCStatusSnapshot | undefined,
   busy: string | null,
   t: (key: MessageKey) => string,
 ): string {
@@ -255,14 +322,3 @@ function headline(
   if (status.locked === null) return t("status.noUser");
   return status.locked ? t("status.locked") : t("status.unlocked");
 }
-
-const local = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.md },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  actions: { gap: spacing.sm },
-  secondaryButton: { backgroundColor: "transparent" },
-  disabled: { opacity: 0.4 },
-  detailRow: { gap: 2, paddingVertical: 6 },
-  destructive: { alignItems: "center" },
-});

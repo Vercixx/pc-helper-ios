@@ -4,15 +4,23 @@
  * The code carries host, port, fingerprint and the one-time pairing code, so a
  * successful scan can go straight to enrollment without the user typing
  * anything.
+ *
+ * The only screen still built out of React Native views: `CameraView` is an RN
+ * view, and there is nothing to gain from hosting it inside SwiftUI. The
+ * permission prompt, which has no camera in it, is native like everything else.
  */
 
+import { Button, ContentUnavailableView, VStack } from "@expo/ui/swift-ui";
+import { buttonBorderShape, buttonStyle, controlSize } from "@expo/ui/swift-ui/modifiers";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { GlassView } from "expo-glass-effect";
 import { Stack, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { parsePairingTicket } from "@/actions/pair";
 import { useT } from "@/i18n";
+import { Screen } from "@/ui/Screen";
 import { spacing, styles as shared } from "@/ui/theme";
 
 export default function ScanScreen() {
@@ -60,13 +68,24 @@ export default function ScanScreen() {
     return (
       <>
         <Stack.Screen options={{ title: t("nav.camera") }} />
-        <View style={shared.centered}>
-          <Text style={shared.title}>{t("scan.permission.title")}</Text>
-          <Text style={[shared.caption, local.center]}>{t("scan.permission.body")}</Text>
-          <Pressable style={[shared.primaryButton, local.stretch]} onPress={requestPermission}>
-            <Text style={shared.primaryButtonLabel}>{t("scan.permission.allow")}</Text>
-          </Pressable>
-        </View>
+        <Screen>
+          <VStack spacing={20}>
+            <ContentUnavailableView
+              title={t("scan.permission.title")}
+              systemImage="camera.fill"
+              description={t("scan.permission.body")}
+            />
+            <Button
+              label={t("scan.permission.allow")}
+              onPress={requestPermission}
+              modifiers={[
+                buttonStyle("glassProminent"),
+                buttonBorderShape("capsule"),
+                controlSize("large"),
+              ]}
+            />
+          </VStack>
+        </Screen>
       </>
     );
   }
@@ -82,8 +101,17 @@ export default function ScanScreen() {
           onBarcodeScanned={onScanned}
         />
         <View style={local.overlay} pointerEvents="none">
+          {/* Left as a plain stroke rather than glass. Glass is a fill, and the
+              one thing that must stay unobstructed is the square the user is
+              aiming at -- Apple's own code scanner draws a stroke here too. */}
           <View style={local.reticle} />
-          <Text style={local.hint}>{problem ?? t("scan.hint")}</Text>
+          {/* The hint, however, is exactly what glass is for: legible over a
+              moving camera feed without a slab of opaque colour. `dark` is
+              pinned because the backdrop is a camera feed, not the app's
+              background, so the system appearance says nothing useful here. */}
+          <GlassView style={local.hintPill} glassEffectStyle="regular" colorScheme="dark">
+            <Text style={local.hint}>{problem ?? t("scan.hint")}</Text>
+          </GlassView>
         </View>
       </View>
     </>
@@ -108,13 +136,17 @@ const local = StyleSheet.create({
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.9)",
   },
-  hint: {
+  hintPill: {
     marginTop: spacing.xl,
+    marginHorizontal: spacing.xl,
+    borderRadius: 22,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    overflow: "hidden",
+  },
+  hint: {
     color: "#fff",
     fontSize: 15,
     textAlign: "center",
-    paddingHorizontal: spacing.xl,
   },
-  center: { textAlign: "center" },
-  stretch: { alignSelf: "stretch", marginTop: spacing.lg },
 });

@@ -11,7 +11,7 @@
 import { en } from "@/i18n/en";
 import { ru } from "@/i18n/ru";
 import { isPlural, pluralForm, selectPlural, type Message } from "@/i18n/plural";
-import { splitAround, translate } from "@/i18n";
+import { translate } from "@/i18n";
 
 const PLACEHOLDER = /\{(\w+)\}/g;
 
@@ -122,20 +122,5 @@ describe("translate", () => {
 
   it("leaves an unknown placeholder alone rather than printing undefined", () => {
     expect(translate("en", "wake.awake")).toBe("{name} is awake.");
-  });
-});
-
-describe("splitAround", () => {
-  it("splits a sentence around its token", () => {
-    expect(splitAround("run {cmd} first", "cmd")).toEqual(["run ", " first"]);
-  });
-
-  it("survives a translation that dropped the token", () => {
-    expect(splitAround("no token here", "cmd")).toEqual(["no token here", ""]);
-  });
-
-  it("handles a token at either end", () => {
-    expect(splitAround("{cmd} then", "cmd")).toEqual(["", " then"]);
-    expect(splitAround("then {cmd}", "cmd")).toEqual(["then ", ""]);
   });
 });

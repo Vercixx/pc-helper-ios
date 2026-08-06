@@ -101,17 +101,3 @@ export function useT(): (key: MessageKey, params?: Params) => string {
 export function useLocale(): Locale {
   return resolveLocale(useLanguageStore((state) => state.language));
 }
-
-/**
- * Split a translated string around a placeholder so the middle can be rendered
- * as its own element -- a command name in a monospace `<Text>`, say.
- *
- * The alternative, cutting the sentence into two catalogue entries, would fix
- * the word order in English and make several of these untranslatable.
- */
-export function splitAround(text: string, token: string): [string, string] {
-  const marker = `{${token}}`;
-  const at = text.indexOf(marker);
-  if (at === -1) return [text, ""];
-  return [text.slice(0, at), text.slice(at + marker.length)];
-}

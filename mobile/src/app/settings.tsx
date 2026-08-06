@@ -6,11 +6,12 @@
  * control to an app that ships outside the App Store.
  */
 
+import { Form, Picker, Section, Text } from "@expo/ui/swift-ui";
+import { labelsHidden, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
 import { Stack } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { systemLocale, useT, useLanguageStore, type LanguageSetting } from "@/i18n";
-import { colors, spacing, styles as shared } from "@/ui/theme";
+import { Screen } from "@/ui/Screen";
 
 /** Each language names itself, as language pickers everywhere do. */
 const CHOICES: { value: LanguageSetting; label: string }[] = [
@@ -27,55 +28,29 @@ export default function SettingsScreen() {
   return (
     <>
       <Stack.Screen options={{ title: t("nav.settings") }} />
-      <ScrollView style={shared.screen} contentContainerStyle={local.content}>
-        <Text style={local.sectionHeader}>{t("settings.language")}</Text>
-
-        <View style={shared.card}>
-          {CHOICES.map((choice, index) => {
-            const selected = language === choice.value;
-            const label =
-              choice.value === "system"
-                ? `${t("settings.language.system")} · ${systemLocale().toUpperCase()}`
-                : choice.label;
-            return (
-              <Pressable
-                key={choice.value}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                onPress={() => setLanguage(choice.value)}
-                style={[local.row, index > 0 ? local.divided : null]}
-              >
-                <Text style={shared.body}>{label}</Text>
-                {selected ? <Text style={local.check}>✓</Text> : null}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Text style={[shared.caption, local.note]}>{t("settings.language.note")}</Text>
-      </ScrollView>
+      <Screen>
+        <Form>
+          <Section title={t("settings.language")} footer={<Text>{t("settings.language.note")}</Text>}>
+            {/* `inline` inside a Form section is the checkmark list this screen
+                used to draw by hand. The label is kept for VoiceOver and then
+                hidden, because the section header already says the same thing. */}
+            <Picker
+              label={t("settings.language")}
+              selection={language}
+              onSelectionChange={(value) => setLanguage(value as LanguageSetting)}
+              modifiers={[pickerStyle("inline"), labelsHidden()]}
+            >
+              {CHOICES.map((choice) => (
+                <Text key={choice.value} modifiers={[tag(choice.value)]}>
+                  {choice.value === "system"
+                    ? `${t("settings.language.system")} · ${systemLocale().toUpperCase()}`
+                    : choice.label}
+                </Text>
+              ))}
+            </Picker>
+          </Section>
+        </Form>
+      </Screen>
     </>
   );
 }
-
-const local = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.md },
-  sectionHeader: {
-    fontSize: 13,
-    color: colors.secondaryLabel,
-    marginLeft: spacing.xs,
-    letterSpacing: 0.5,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: spacing.sm,
-  },
-  divided: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.separator,
-  },
-  check: { fontSize: 17, fontWeight: "600", color: colors.tint },
-  note: { marginTop: spacing.xs },
-});

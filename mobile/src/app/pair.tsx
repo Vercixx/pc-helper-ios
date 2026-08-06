@@ -4,29 +4,53 @@
  * Reached either from a QR scan (everything pre-filled) or from the discovery
  * list / manual entry (the user types the 8-character code). Submitting parks
  * until somebody approves the device at the PC's own keyboard.
+ *
+ * Each field is held twice on purpose. The SwiftUI `TextField` is driven by an
+ * `ObservableState`, which lives on the native side and does not re-render
+ * React; the plain `useState` beside it is the copy this component validates
+ * and submits. `onTextChange` keeps the two in step.
  */
 
+import {
+  Button,
+  Form,
+  HStack,
+  ProgressView,
+  Section,
+  Spacer,
+  Text,
+  TextField,
+  VStack,
+  useNativeState,
+} from "@expo/ui/swift-ui";
+import {
+  accessibilityLabel,
+  autocorrectionDisabled,
+  buttonBorderShape,
+  buttonStyle,
+  controlSize,
+  disabled,
+  font,
+  foregroundStyle,
+  keyboardType,
+  kerning,
+  lineLimit,
+  multilineTextAlignment,
+  textInputAutocapitalization,
+  textSelection,
+} from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
 
 import { pairWithPC } from "@/actions/pair";
 import { fetchServerInfo } from "@/api/client";
 import { ApiError } from "@/api/types";
 import { CODE_LENGTH, normalizeCode } from "@/crypto/canonical";
-import { splitAround, useT } from "@/i18n";
-import { colors, spacing, styles as shared } from "@/ui/theme";
+import { useT } from "@/i18n";
+import { PAIR_COMMAND_MARKDOWN } from "@/ui/copy";
+import { Screen } from "@/ui/Screen";
+import { secondaryText } from "@/ui/theme";
 
 type Params = {
   host?: string;
@@ -44,16 +68,27 @@ export default function PairScreen() {
   const router = useRouter();
   const t = useT();
 
-  const [host, setHost] = useState(params.host ?? "");
-  const [port, setPort] = useState(params.port ?? "8765");
+  const initialCode = params.code ? normalizeCode(params.code) : "";
+  const initialHost = params.host ?? "";
+  const initialPort = params.port ?? "8765";
+
+  // The native side of each field. `useNativeState` captures its argument on
+  // the first render only, which is also the only chance to seed a TextField --
+  // it has no `defaultValue`.
+  const codeState = useNativeState(initialCode);
+  const hostState = useNativeState(initialHost);
+  const portState = useNativeState(initialPort);
+
+  const [code, setCode] = useState(initialCode);
+  const [host, setHost] = useState(initialHost);
+  const [port, setPort] = useState(initialPort);
   const [fingerprint, setFingerprint] = useState(params.fp ?? "");
-  const [code, setCode] = useState(params.code ? normalizeCode(params.code) : "");
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   const scanned = Boolean(params.fp);
-  const codeReady = normalizeCode(code).length === CODE_LENGTH;
+  const codeReady = code.length === CODE_LENGTH;
   const hostReady = host.trim().length > 0;
   const portNumber = Number.parseInt(port, 10);
   const portReady = Number.isInteger(portNumber) && portNumber > 0 && portNumber < 65536;
@@ -64,7 +99,17 @@ export default function PairScreen() {
     [host, portNumber],
   );
 
-  const [codeHintBefore, codeHintAfter] = splitAround(t("pair.code.hint"), "cmd");
+  /**
+   * Fold look-alike characters as they are typed.
+   *
+   * The field only gets written back when normalising actually changed
+   * something -- echoing every keystroke would fight the cursor.
+   */
+  function onCodeChange(text: string) {
+    const normalized = normalizeCode(text).slice(0, CODE_LENGTH);
+    setCode(normalized);
+    if (normalized !== text) codeState.set(normalized);
+  }
 
   async function submit() {
     setError(null);
@@ -86,7 +131,7 @@ export default function PairScreen() {
       setPhase("waiting");
       await pairWithPC({
         endpoint,
-        code: normalizeCode(code),
+        code,
         expectedFingerprint: expected,
         instanceName: params.instance,
         fallbackName: params.name,
@@ -109,124 +154,137 @@ export default function PairScreen() {
       <Stack.Screen
         options={{ title: scanned ? t("nav.confirmPairing") : t("nav.pairWithPC") }}
       />
-      <KeyboardAvoidingView
-        style={shared.screen}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView contentContainerStyle={local.content} keyboardShouldPersistTaps="handled">
-          <View style={shared.card}>
-            <Text style={local.label}>{t("pair.code.label")}</Text>
-            <TextInput
-              value={code}
-              onChangeText={(text) => setCode(normalizeCode(text).slice(0, CODE_LENGTH))}
+      {/* No KeyboardAvoidingView: a SwiftUI Form already lifts the focused
+          field clear of the keyboard, which is one of the things that stops
+          having to be reimplemented here. */}
+      <Screen>
+        <Form>
+          <Section
+            title={t("pair.code.label")}
+            footer={
+              <Text markdownEnabled modifiers={[font({ size: 13 }), secondaryText, lineLimit()]}>
+                {t("pair.code.hint", { cmd: PAIR_COMMAND_MARKDOWN })}
+              </Text>
+            }
+          >
+            <TextField
+              text={codeState}
               placeholder="K7M2QX4B"
-              autoCapitalize="characters"
-              autoCorrect={false}
+              maxLength={CODE_LENGTH}
               autoFocus={!params.code}
-              maxLength={CODE_LENGTH + 1}
-              style={local.codeInput}
-              accessibilityLabel={t("pair.code.a11y")}
+              onTextChange={onCodeChange}
+              modifiers={[
+                font({ size: 28, weight: "semibold", design: "monospaced" }),
+                kerning(6),
+                multilineTextAlignment("center"),
+                textInputAutocapitalization("characters"),
+                autocorrectionDisabled(),
+                accessibilityLabel(t("pair.code.a11y")),
+              ]}
             />
-            <Text style={shared.caption}>
-              {codeHintBefore}
-              <Text style={shared.mono}>wol-unlockctl pair</Text>
-              {codeHintAfter}
-            </Text>
-          </View>
+          </Section>
 
-          <View style={shared.card}>
-            <Text style={local.label}>{t("pair.address.label")}</Text>
-            <TextInput
-              value={host}
-              onChangeText={setHost}
+          <Section
+            title={t("pair.address.label")}
+            footer={
+              !portReady ? (
+                <Text modifiers={[font({ size: 13 }), foregroundStyle("red")]}>
+                  {t("pair.port.range")}
+                </Text>
+              ) : undefined
+            }
+          >
+            <TextField
+              text={hostState}
               placeholder="my-pc.local"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              style={local.input}
-              accessibilityLabel={t("pair.host.a11y")}
+              onTextChange={setHost}
+              modifiers={[
+                keyboardType("url"),
+                textInputAutocapitalization("never"),
+                autocorrectionDisabled(),
+                accessibilityLabel(t("pair.host.a11y")),
+              ]}
             />
-            <TextInput
-              value={port}
-              onChangeText={setPort}
+            <TextField
+              text={portState}
               placeholder="8765"
-              keyboardType="number-pad"
-              style={local.input}
-              accessibilityLabel={t("pair.port.a11y")}
+              onTextChange={setPort}
+              modifiers={[keyboardType("numeric"), accessibilityLabel(t("pair.port.a11y"))]}
             />
-            {!portReady ? (
-              <Text style={[shared.caption, { color: colors.red }]}>{t("pair.port.range")}</Text>
-            ) : null}
-          </View>
+          </Section>
 
           {fingerprint ? (
-            <View style={shared.card}>
-              <Text style={local.label}>{t("pair.identity.label")}</Text>
-              <Text style={shared.mono}>{fingerprint}</Text>
-              <Text style={shared.caption}>
-                {scanned ? t("pair.identity.scanned") : t("pair.identity.manual")}
+            <Section
+              title={t("pair.identity.label")}
+              footer={
+                <Text modifiers={[font({ size: 13 }), secondaryText, lineLimit()]}>
+                  {scanned ? t("pair.identity.scanned") : t("pair.identity.manual")}
+                </Text>
+              }
+            >
+              <Text
+                modifiers={[
+                  font({ size: 12, design: "monospaced" }),
+                  lineLimit(),
+                  textSelection(true),
+                ]}
+              >
+                {fingerprint}
               </Text>
-            </View>
+            </Section>
           ) : null}
 
           {phase === "waiting" ? (
-            <View style={[shared.card, local.waiting]}>
-              <ActivityIndicator />
-              <View style={local.grow}>
-                <Text style={shared.body}>{t("pair.waiting.title")}</Text>
-                <Text style={shared.caption}>{t("pair.waiting.body")}</Text>
-              </View>
-            </View>
+            <Section>
+              <HStack spacing={12}>
+                <ProgressView />
+                <VStack alignment="leading" spacing={2}>
+                  <Text>{t("pair.waiting.title")}</Text>
+                  <Text modifiers={[font({ size: 13 }), secondaryText, lineLimit()]}>
+                    {t("pair.waiting.body")}
+                  </Text>
+                </VStack>
+                <Spacer />
+              </HStack>
+            </Section>
           ) : null}
 
           {error ? (
-            <View style={shared.card}>
-              <Text style={{ color: colors.red }}>{error}</Text>
-            </View>
+            <Section>
+              <Text modifiers={[foregroundStyle("red"), lineLimit()]}>{error}</Text>
+            </Section>
           ) : null}
 
-          {note ? <Text style={[shared.caption, local.center]}>{note}</Text> : null}
-
-          <Pressable
-            style={[shared.primaryButton, !canSubmit && local.disabled]}
-            disabled={!canSubmit}
-            onPress={() => void submit()}
-            accessibilityRole="button"
+          <Section
+            footer={
+              note ? (
+                <Text modifiers={[font({ size: 13 }), secondaryText]}>{note}</Text>
+              ) : undefined
+            }
           >
-            <Text style={shared.primaryButtonLabel}>
-              {phase === "checking"
-                ? t("pair.contacting")
-                : phase === "waiting"
-                  ? t("pair.waiting")
-                  : t("pair.submit")}
-            </Text>
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <HStack>
+              <Spacer />
+              <Button
+                label={
+                  phase === "checking"
+                    ? t("pair.contacting")
+                    : phase === "waiting"
+                      ? t("pair.waiting")
+                      : t("pair.submit")
+                }
+                onPress={() => void submit()}
+                modifiers={[
+                  buttonStyle("glassProminent"),
+                  buttonBorderShape("capsule"),
+                  controlSize("large"),
+                  disabled(!canSubmit),
+                ]}
+              />
+              <Spacer />
+            </HStack>
+          </Section>
+        </Form>
+      </Screen>
     </>
   );
 }
-
-const local = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.md },
-  label: { fontSize: 12, letterSpacing: 0.6, color: colors.secondaryLabel },
-  input: {
-    fontSize: 17,
-    color: colors.label,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-  },
-  codeInput: {
-    fontSize: 32,
-    letterSpacing: 6,
-    fontWeight: "600",
-    color: colors.label,
-    paddingVertical: spacing.sm,
-    textAlign: "center",
-  },
-  waiting: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  grow: { flex: 1, gap: 2 },
-  center: { textAlign: "center" },
-  disabled: { opacity: 0.4 },
-});
