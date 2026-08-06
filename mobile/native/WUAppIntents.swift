@@ -69,6 +69,7 @@ struct PCQuery: EntityQuery {
 enum IntentFailure: Error, CustomLocalizedStringResourceConvertible {
   case notPaired
   case cannotUnlock
+  case cannotLock
   case wakeFailed(String)
 
   var localizedStringResource: LocalizedStringResource {
@@ -82,6 +83,11 @@ enum IntentFailure: Error, CustomLocalizedStringResourceConvertible {
       return LocalizedStringResource(
         "intent.error.cannotUnlock",
         defaultValue: "That PC doesn't offer unlocking."
+      )
+    case .cannotLock:
+      return LocalizedStringResource(
+        "intent.error.cannotLock",
+        defaultValue: "That PC doesn't offer locking."
       )
     case .wakeFailed(let reason):
       return LocalizedStringResource(
@@ -242,6 +248,63 @@ struct UnlockPCIntent: AppIntent {
   }
 }
 
+// MARK: - Lock
+
+struct LockPCIntent: AppIntent {
+  static var title = LocalizedStringResource(
+    "intent.lock.title",
+    defaultValue: "Lock PC session"
+  )
+  static var description = IntentDescription(
+    LocalizedStringResource(
+      "intent.lock.description",
+      defaultValue: "Locks the desktop session on a paired PC."
+    )
+  )
+  static var openAppWhenRun: Bool = false
+
+  /// The other half of the security decision in this file, and deliberately not
+  /// a copy of it.
+  ///
+  /// `UnlockPCIntent` sets `authenticationPolicy = .requiresAuthentication`
+  /// because a shortcut sitting in Control Center would otherwise be a one-tap
+  /// way *into* a desktop session for whoever is holding the phone. Locking one
+  /// is the opposite trade: the worst it can do is cost its owner a password
+  /// prompt, and being able to run it from the Lock Screen -- having walked away
+  /// from the desk without locking it -- is the entire point of having it here.
+  ///
+  /// So the absence of `authenticationPolicy` below is the feature. Do not
+  /// "fix" it to match the intent above.
+
+  @Parameter(title: LocalizedStringResource("entity.pc", defaultValue: "PC"))
+  var target: PCEntity?
+
+  init() {}
+  init(target: PCEntity?) { self.target = target }
+
+  func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+    let pc = try resolve(target)
+    guard pc.canLock else { throw IntentFailure.cannotLock }
+
+    let message: String
+    do {
+      let outcome = try await WUClient.lock(pc: pc)
+      message = outcome.wasLocked
+        ? String(
+            localized: "intent.lock.alreadyLocked",
+            defaultValue: "\(pc.name) was already locked."
+          )
+        : String(localized: "intent.lock.done", defaultValue: "Locked \(pc.name).")
+    } catch {
+      message = String(
+        localized: "intent.failure",
+        defaultValue: "\(pc.name): \(error.localizedDescription)"
+      )
+    }
+    return .result(value: message, dialog: IntentDialog(stringLiteral: message))
+  }
+}
+
 // MARK: - Siri phrases
 
 /// Phrases are localized through `AppShortcuts.strings`, keyed by the English
@@ -275,6 +338,14 @@ struct PCUnlockShortcuts: AppShortcutsProvider {
       ],
       shortTitle: LocalizedStringResource("shortcut.unlock", defaultValue: "Unlock PC"),
       systemImageName: "lock.open"
+    )
+    AppShortcut(
+      intent: LockPCIntent(),
+      phrases: [
+        "Lock my PC with \(.applicationName)",
+      ],
+      shortTitle: LocalizedStringResource("shortcut.lock", defaultValue: "Lock PC"),
+      systemImageName: "lock.fill"
     )
   }
 }

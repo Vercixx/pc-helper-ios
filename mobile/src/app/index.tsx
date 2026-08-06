@@ -149,7 +149,7 @@ function PCRow({
 }) {
   const router = useRouter();
   const t = useT();
-  const { busy, feedback, refresh, refreshIfStale, wake, unlock } = usePCActions(pc);
+  const { busy, feedback, refresh, refreshIfStale, wake, unlock, lock } = usePCActions(pc);
 
   // Refresh whenever the list comes back into view, so what is shown is never
   // left over from a previous app session. Throttled: returning from the detail
@@ -168,9 +168,13 @@ function PCRow({
     [router, pc.id],
   );
 
-  const canUnlock = pc.capabilities.includes("unlock");
   const canWake = pc.wake.macs.length > 0;
   const subtitle = describe(pc, status, busy, t);
+  // Same rule as the detail screen: whichever of the two is possible right now,
+  // never both -- a menu entry that cannot do anything is worse than no entry.
+  const canUnlock = pc.capabilities.includes("unlock");
+  const showLock =
+    pc.capabilities.includes("lock") && status?.reachable === true && status.locked === false;
 
   return (
     <ContextMenu>
@@ -178,7 +182,9 @@ function PCRow({
         {canWake ? (
           <Button label={t("action.wake")} systemImage="power" onPress={() => void wake()} />
         ) : null}
-        {canUnlock ? (
+        {showLock ? (
+          <Button label={t("action.lock")} systemImage="lock.fill" onPress={() => void lock()} />
+        ) : canUnlock ? (
           <Button
             label={t("action.unlock")}
             systemImage="lock.open"
@@ -248,10 +254,13 @@ function describe(
 ): string {
   if (busy === "wake") return t("status.waking");
   if (busy === "unlock") return t("status.unlocking");
+  if (busy === "lock") return t("status.locking");
   if (busy === "status") return t("status.checking");
   if (!status) return pc.hostname;
   // `status.error` arrives already translated -- ApiError.friendly does it.
   if (!status.reachable) return status.error ?? t("status.asleep");
   if (status.locked === null) return t("status.noUser");
-  return status.locked ? t("status.lockedHint") : t("status.unlocked");
+  // The hint names whichever action the long press now offers.
+  if (status.locked) return t("status.lockedHint");
+  return pc.capabilities.includes("lock") ? t("status.unlockedHint") : t("status.unlocked");
 }

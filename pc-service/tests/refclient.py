@@ -342,6 +342,14 @@ def cmd_unlock(client: Client, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_lock(client: Client, args: argparse.Namespace) -> int:
+    data = client.call("POST", "/v1/lock", {"session_id": args.session_id})
+    _print("session", data["session_id"])
+    _print("was_locked", data["was_locked"])
+    _print("locked", data["locked"])
+    return 0
+
+
 def cmd_wake(client: Client, args: argparse.Namespace) -> int:
     data = client.call("POST", "/v1/wake", {"target": args.target})
     for sent in data.get("sent", []):
@@ -470,6 +478,7 @@ COMMANDS = {
     "pair": cmd_pair,
     "status": cmd_status,
     "unlock": cmd_unlock,
+    "lock": cmd_lock,
     "wake": cmd_wake,
     "replay": cmd_replay,
     "tamper": cmd_tamper,
@@ -491,6 +500,9 @@ def main(argv: list[str] | None = None) -> int:
 
     unlock = sub.add_parser("unlock")
     unlock.add_argument("--session-id", default=None)
+
+    lock = sub.add_parser("lock")
+    lock.add_argument("--session-id", default=None)
 
     wake = sub.add_parser("wake")
     wake.add_argument("--target", default="self")

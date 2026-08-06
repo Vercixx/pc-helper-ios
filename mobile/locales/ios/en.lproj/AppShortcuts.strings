@@ -14,3 +14,4 @@
 "Check my PC with ${applicationName}" = "Check my PC with ${applicationName}";
 "Is my PC awake in ${applicationName}" = "Is my PC awake in ${applicationName}";
 "Unlock my PC with ${applicationName}" = "Unlock my PC with ${applicationName}";
+"Lock my PC with ${applicationName}" = "Lock my PC with ${applicationName}";

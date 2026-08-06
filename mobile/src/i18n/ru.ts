@@ -30,15 +30,18 @@ export const ru: Catalog = {
 
   "status.waking": "Пробуждение…",
   "status.unlocking": "Разблокировка…",
+  "status.locking": "Блокировка…",
   "status.checking": "Проверка…",
   "status.asleep": "Спит или недоступен",
   "status.noUser": "В сети — никто не вошёл",
   "status.lockedHint": "Заблокирован — долгое нажатие, чтобы разблокировать",
+  "status.unlockedHint": "Разблокирован — долгое нажатие, чтобы заблокировать",
   "status.locked": "Заблокирован",
   "status.unlocked": "Разблокирован",
 
   "action.wake": "Разбудить",
   "action.unlock": "Разблокировать сеанс",
+  "action.lock": "Заблокировать сеанс",
   "action.refresh": "Обновить",
   "action.details": "Подробности",
 
@@ -134,11 +137,14 @@ export const ru: Catalog = {
   "unlock.done": "Сеанс {id} разблокирован.",
   "unlock.alreadyUnlocked": "{name} уже был разблокирован.",
 
+  "lock.done": "Сеанс {id} заблокирован.",
+  "lock.alreadyLocked": "{name} уже был заблокирован.",
+
   "error.unreachable": "Не удаётся связаться с этим ПК. Он включён и в той же сети Wi-Fi?",
   "error.device_revoked": "Доступ этого телефона отозван. Выполните сопряжение заново.",
   "error.unknown_device": "Этот ПК не узнаёт этот телефон. Выполните сопряжение заново.",
   "error.timestamp_out_of_window": "Часы телефона расходятся с часами ПК.",
-  "error.no_session": "На этом ПК никто не вошёл, поэтому разблокировать нечего.",
+  "error.no_session": "На этом ПК никто не вошёл, поэтому блокировать или разблокировать нечего.",
   "error.rate_limited": "Слишком много запросов. Подождите немного и попробуйте снова.",
   "error.forbidden_network": "ПК отклонил эту сеть. Подключитесь к той же локальной сети.",
   "error.bad_signature": "Ответ не подписан этим ПК. Возможно, кто-то выдаёт себя за него.",

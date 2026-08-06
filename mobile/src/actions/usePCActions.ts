@@ -1,13 +1,13 @@
 /**
- * The three things a user can do to a PC, with their surrounding bookkeeping:
- * refresh status, wake, unlock.
+ * The four things a user can do to a PC, with their surrounding bookkeeping:
+ * refresh status, wake, unlock, lock.
  *
  * Kept out of the screens so the list and the detail view behave identically.
  */
 
 import { useCallback, useRef, useState } from "react";
 
-import { getStatus, unlockSession } from "@/api/client";
+import { getStatus, lockSession, unlockSession } from "@/api/client";
 import { resolveAndRemember } from "@/api/endpoint";
 import { ApiError } from "@/api/types";
 import { sendWakePackets, waitUntilAwake } from "@/actions/wake";
@@ -16,7 +16,7 @@ import { t } from "@/i18n";
 import { usePCStore } from "@/state/store";
 import type { LinkedPC } from "@/state/types";
 
-export type Busy = null | "status" | "wake" | "unlock";
+export type Busy = null | "status" | "wake" | "unlock" | "lock";
 
 export type ActionFeedback = {
   tone: "success" | "error" | "info";
@@ -247,10 +247,63 @@ export function usePCActions(pc: LinkedPC | undefined) {
     }
   }, [currentPC, ensureMigrated, remember, setStatus, touchLastSeen]);
 
+  /**
+   * Lock the session.
+   *
+   * Deliberately not a mirror of `unlock` in one respect: there is no biometric
+   * gate. `requireBiometricsForUnlock` is named for the direction that hands
+   * whoever holds the phone a live desktop; locking one, at worst, costs its
+   * owner a password prompt. Gating it would be caution copied by reflex, and
+   * would make the safe action harder to reach than the dangerous one.
+   */
+  const lock = useCallback(async () => {
+    const target = currentPC();
+    if (!target) return;
+    setBusy("lock");
+    setFeedback(null);
+    try {
+      await ensureMigrated();
+
+      const endpoint = await resolveAndRemember(target, remember);
+      const result = await lockSession(target, endpoint);
+      setFeedback({
+        tone: "success",
+        message: result.was_locked
+          ? t("lock.alreadyLocked", { name: target.name })
+          : t("lock.done", { id: result.session_id }),
+      });
+      setStatus(target.id, {
+        reachable: true,
+        locked: true,
+        sessionId: result.session_id,
+        desktop: result.desktop,
+        checkedAt: Date.now(),
+      });
+      touchLastSeen(target);
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: error instanceof ApiError ? error.friendly : String(error),
+      });
+    } finally {
+      setBusy(null);
+    }
+  }, [currentPC, ensureMigrated, remember, setStatus, touchLastSeen]);
+
   const cancelWake = useCallback(() => {
     wakeAbort.current?.abort();
     setBusy(null);
   }, []);
 
-  return { busy, feedback, setFeedback, refresh, refreshIfStale, wake, unlock, cancelWake };
+  return {
+    busy,
+    feedback,
+    setFeedback,
+    refresh,
+    refreshIfStale,
+    wake,
+    unlock,
+    lock,
+    cancelWake,
+  };
 }

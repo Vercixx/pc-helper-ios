@@ -140,7 +140,12 @@ class TestRouteProtection:
 
     @pytest.mark.parametrize(
         "method,path",
-        [("GET", "/v1/status"), ("POST", "/v1/wake"), ("POST", "/v1/unlock")],
+        [
+            ("GET", "/v1/status"),
+            ("POST", "/v1/wake"),
+            ("POST", "/v1/unlock"),
+            ("POST", "/v1/lock"),
+        ],
     )
     async def test_protected_routes_reject_unsigned(self, api, method, path):
         """Regression: routes with no path variables produce an *empty*
@@ -340,6 +345,37 @@ class TestUnlock:
 
     async def test_malformed_session_id(self, api):
         response, body = await api.call("POST", "/v1/unlock", {"session_id": "; rm -rf /"})
+        assert response.status == 400
+
+
+class TestLock:
+    async def test_can_be_disabled_by_config(self, context, device_key, identity):
+        """Its own switch, not unlock's: turning unlock off is a decision about
+        the risky direction and must not take the safe one away too."""
+        disabled = replace(context.config, lock_enabled=False)
+        pubkey = device_key.public_key().public_bytes_raw()
+        await context.store.upsert_device(
+            device_id=C.device_id_for(pubkey), pubkey=pubkey,
+            name="d", platform="ios", now=int(time.time()),
+        )
+        server = TestServer(build_app(replace(context, config=disabled)))
+        client = TestClient(server)
+        await client.start_server()
+        signed = SignedClient(client, device_key, identity, C.device_id_for(pubkey))
+        try:
+            response, body = await signed.call("POST", "/v1/lock", {"session_id": None})
+            assert response.status == 403
+            assert body["error"]["code"] == "not_allowed"
+        finally:
+            await client.close()
+
+    async def test_disabling_unlock_leaves_lock_alone(self, context, device_key, identity):
+        no_unlock = replace(context.config, unlock_enabled=False)
+        assert "lock" in no_unlock.capabilities
+        assert "unlock" not in no_unlock.capabilities
+
+    async def test_malformed_session_id(self, api):
+        response, body = await api.call("POST", "/v1/lock", {"session_id": "; rm -rf /"})
         assert response.status == 400
 
 

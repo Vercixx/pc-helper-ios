@@ -20,13 +20,19 @@
       "\"intent.unlock.description\"": "Разблокирует сеанс рабочего стола на сопряжённом ПК. Сначала нужно разблокировать это устройство.",
       "\"intent.unlock.done\"": "%@ разблокирован.",
       "\"intent.unlock.alreadyUnlocked\"": "%@ уже был разблокирован.",
+      "\"intent.lock.title\"": "Заблокировать сеанс ПК",
+      "\"intent.lock.description\"": "Блокирует сеанс рабочего стола на сопряжённом ПК.",
+      "\"intent.lock.done\"": "%@ заблокирован.",
+      "\"intent.lock.alreadyLocked\"": "%@ уже был заблокирован.",
       "\"intent.failure\"": "%1$@: %2$@",
       "\"intent.error.notPaired\"": "Нет сопряжённых ПК. Откройте PC Unlock и выполните сопряжение.",
       "\"intent.error.cannotUnlock\"": "Этот ПК не поддерживает разблокировку.",
+      "\"intent.error.cannotLock\"": "Этот ПК не поддерживает блокировку.",
       "\"intent.error.wakeFailed\"": "Не удалось отправить пакет пробуждения: %@",
       "\"shortcut.wake\"": "Разбудить ПК",
       "\"shortcut.status\"": "Состояние ПК",
-      "\"shortcut.unlock\"": "Разблокировать ПК"
+      "\"shortcut.unlock\"": "Разблокировать ПК",
+      "\"shortcut.lock\"": "Заблокировать ПК"
     }
   }
 }

@@ -11,3 +11,4 @@
 "Check my PC with ${applicationName}" = "Проверь мой ПК через ${applicationName}";
 "Is my PC awake in ${applicationName}" = "Мой ПК включён, ${applicationName}";
 "Unlock my PC with ${applicationName}" = "Разблокируй мой ПК через ${applicationName}";
+"Lock my PC with ${applicationName}" = "Заблокируй мой ПК через ${applicationName}";

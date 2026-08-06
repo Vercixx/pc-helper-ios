@@ -35,6 +35,7 @@ import {
   type PairResponse,
   type ServerInfo,
   type StatusResponse,
+  type LockResponse,
   type UnlockResponse,
   type WakeResponse,
 } from "./types";
@@ -226,6 +227,20 @@ export async function unlockSession(
     endpoint,
     "POST",
     "/v1/unlock",
+    { session_id: sessionId },
+  );
+}
+
+export async function lockSession(
+  pc: LinkedPC,
+  endpoint: Endpoint,
+  sessionId: string | null = null,
+): Promise<LockResponse> {
+  return signedCall<LockResponse>(
+    pc,
+    endpoint,
+    "POST",
+    "/v1/lock",
     { session_id: sessionId },
   );
 }

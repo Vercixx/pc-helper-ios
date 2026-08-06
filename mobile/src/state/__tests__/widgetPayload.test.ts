@@ -42,6 +42,7 @@ describe("buildWidgetPayload", () => {
       [
         "broadcast",
         "canUnlock",
+        "canLock",
         "deviceId",
         "hostname",
         "id",
@@ -81,6 +82,15 @@ describe("buildWidgetPayload", () => {
   it("publishes a null status rather than omitting it when nothing is known", () => {
     const pc = buildWidgetPayload([PC], {}).pcs[0]!;
     expect(pc.status).toBeNull();
+  });
+
+  it("reports canLock from the capability, independently of canUnlock", () => {
+    // The two are separate switches on the service, so one must not imply the
+    // other -- a PC with unlock turned off can still be locked.
+    const lockOnly = { ...PC, capabilities: ["status", "lock"] };
+    const built = buildWidgetPayload([lockOnly], {}).pcs[0]!;
+    expect(built.canLock).toBe(true);
+    expect(built.canUnlock).toBe(false);
   });
 
   it("reports canUnlock false for a PC that cannot unlock", () => {

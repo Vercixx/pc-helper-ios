@@ -192,3 +192,22 @@ async def unlock(request: web.Request) -> dict[str, Any]:
 
     result = await session_mod.unlock_session(session_id)
     return result.to_dict()
+
+
+# --------------------------------------------------------------------------- #
+# POST /v1/lock  (signed)
+# --------------------------------------------------------------------------- #
+
+@signed
+async def lock(request: web.Request) -> dict[str, Any]:
+    ctx = _context(request)
+    if not ctx.config.lock_enabled:
+        raise ApiError("not_allowed", "locking is disabled in the configuration")
+
+    data = await _json_body(request)
+    session_id = _optional_str(data, "session_id")
+
+    # Not `unlock_session`'s target: locking wants the session that is *not*
+    # already locked. See PROTOCOL.md 6.2.
+    result = await session_mod.lock_session(session_id)
+    return result.to_dict()

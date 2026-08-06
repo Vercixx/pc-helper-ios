@@ -35,16 +35,19 @@ export const en = {
   // Status lines.
   "status.waking": "Waking…",
   "status.unlocking": "Unlocking…",
+  "status.locking": "Locking…",
   "status.checking": "Checking…",
   "status.asleep": "Asleep or unreachable",
   "status.noUser": "Online — nobody logged in",
   "status.lockedHint": "Locked — long press to unlock",
+  "status.unlockedHint": "Unlocked — long press to lock",
   "status.locked": "Locked",
   "status.unlocked": "Unlocked",
 
   // Actions.
   "action.wake": "Wake up",
   "action.unlock": "Unlock session",
+  "action.lock": "Lock session",
   "action.refresh": "Refresh",
   "action.details": "Details",
 
@@ -146,12 +149,15 @@ export const en = {
   "unlock.done": "Unlocked session {id}.",
   "unlock.alreadyUnlocked": "{name} was already unlocked.",
 
+  "lock.done": "Locked session {id}.",
+  "lock.alreadyLocked": "{name} was already locked.",
+
   // Errors, keyed by the protocol's error codes (PROTOCOL.md 4.1).
   "error.unreachable": "Can't reach this PC. Is it awake and on the same Wi-Fi?",
   "error.device_revoked": "This phone's access was revoked. Pair with the PC again.",
   "error.unknown_device": "This PC doesn't recognise this phone. Pair again.",
   "error.timestamp_out_of_window": "Your phone's clock is out of sync with the PC.",
-  "error.no_session": "Nobody is logged in on that PC, so there's no session to unlock.",
+  "error.no_session": "Nobody is logged in on that PC, so there's no session to lock or unlock.",
   "error.rate_limited": "Too many requests. Wait a moment and try again.",
   "error.forbidden_network": "The PC refused this network. Connect to the same LAN.",
   "error.bad_signature":

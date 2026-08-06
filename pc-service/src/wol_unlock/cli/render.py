@@ -155,6 +155,10 @@ def render_status(data: dict[str, Any]) -> Group:
         _("status.unlock"),
         fmt_bool(data.get("unlock_enabled"), _("status.enabled"), _("status.disabled")),
     )
+    head.add_row(
+        _("status.lock"),
+        fmt_bool(data.get("lock_enabled"), _("status.enabled"), _("status.disabled")),
+    )
     if data.get("config_path"):
         head.add_row(_("status.config"), str(data["config_path"]))
 

@@ -27,7 +27,10 @@ enum SharedState {
   /// Relative to the app's Documents directory. Matches `STATE_FILE` in
   /// `src/state/widgetBridge.ts`.
   static let stateFileName = "wolunlock-state.json"
-  static let currentVersion = 1
+  /// 2 since `canLock`. Must match `WIDGET_PAYLOAD_VERSION` in
+  /// `src/state/widgetPayload.ts` -- a mismatch means every PC reads as
+  /// unpaired until the app republishes.
+  static let currentVersion = 2
 
   struct Endpoint {
     let host: String
@@ -55,6 +58,7 @@ enum SharedState {
     let broadcast: String
     let wakePort: Int
     let canUnlock: Bool
+    let canLock: Bool
     let status: Snapshot?
 
     /// Addresses to try, best first: the one that worked last leads, because

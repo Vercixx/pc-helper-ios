@@ -229,6 +229,7 @@ class ControlServer:
                 "devices": len(await ctx.store.list_devices(include_revoked=False)),
                 "config_path": str(ctx.config.source_path) if ctx.config.source_path else None,
                 "unlock_enabled": ctx.config.unlock_enabled,
+                "lock_enabled": ctx.config.lock_enabled,
             }
 
         if command == P.CMD_PAIR_BEGIN:

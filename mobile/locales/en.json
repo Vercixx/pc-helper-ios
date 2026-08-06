@@ -20,13 +20,19 @@
       "\"intent.unlock.description\"": "Unlocks the desktop session on a paired PC. Requires unlocking this device first.",
       "\"intent.unlock.done\"": "Unlocked %@.",
       "\"intent.unlock.alreadyUnlocked\"": "%@ was already unlocked.",
+      "\"intent.lock.title\"": "Lock PC session",
+      "\"intent.lock.description\"": "Locks the desktop session on a paired PC.",
+      "\"intent.lock.done\"": "Locked %@.",
+      "\"intent.lock.alreadyLocked\"": "%@ was already locked.",
       "\"intent.failure\"": "%1$@: %2$@",
       "\"intent.error.notPaired\"": "No PC is paired. Open PC Unlock and pair one first.",
       "\"intent.error.cannotUnlock\"": "That PC doesn't offer unlocking.",
+      "\"intent.error.cannotLock\"": "That PC doesn't offer locking.",
       "\"intent.error.wakeFailed\"": "Couldn't send the wake packet: %@",
       "\"shortcut.wake\"": "Wake PC",
       "\"shortcut.status\"": "PC status",
-      "\"shortcut.unlock\"": "Unlock PC"
+      "\"shortcut.unlock\"": "Unlock PC",
+      "\"shortcut.lock\"": "Lock PC"
     }
   }
 }

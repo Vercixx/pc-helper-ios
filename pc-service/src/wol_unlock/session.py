@@ -1,12 +1,18 @@
-"""logind session discovery and unlocking.
+"""logind session discovery, unlocking, and locking.
 
 Why this needs no privileges
 ----------------------------
-``org.freedesktop.login1.policy`` defines a ``lock-sessions`` action but no
-``unlock-session`` action. logind consults polkit only when the caller's uid
-differs from the target session's uid; a service running as the session owner is
-authorized implicitly. So this module runs as an ordinary user with no sudo, no
-setuid binary, and no polkit rule.
+``org.freedesktop.login1.policy`` defines a single action,
+``org.freedesktop.login1.lock-sessions``, described as "Lock or unlock active
+sessions" -- it guards *both* directions, so the absence of a separate
+``unlock-session`` action is not the reason either call works.
+
+The reason is the caller's uid. logind passes the session owner's uid to
+``bus_verify_polkit_async`` as its ``good_user`` argument, which returns
+"authorized" before polkit is ever consulted when the calling process's uid
+matches. That is a property of *who is asking*, not of *which verb*, which is why
+it covers lock and unlock alike. So this module runs as an ordinary user with no
+sudo, no setuid binary, and no polkit rule.
 
 Why it shells out
 -----------------
@@ -20,7 +26,15 @@ Why the result is re-read
 or not any screen locker acts on it. Reporting success from that exit code would
 be a lie on a system running a locker that ignores logind (bare swaylock, i3lock).
 So we poll ``LockedHint`` afterwards and only report success once it actually
-clears.
+changes. ``lock-session`` has the same problem in the other direction, and gets
+the same treatment.
+
+Why lock and unlock do not share a target
+-----------------------------------------
+They rank candidate sessions inversely: unlock wants the locked one, lock wants
+the unlocked one. See :func:`_rank_for_unlock` and :func:`_rank_for_lock`. On a
+single-session desktop both pick the same session, so getting this wrong is
+invisible until someone runs two seats.
 """
 
 from __future__ import annotations
@@ -30,6 +44,7 @@ import json
 import os
 import re
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -42,6 +57,12 @@ GRAPHICAL_TYPES = frozenset({"wayland", "x11", "mir"})
 # How long to wait for the screen locker to react to logind's Unlock signal.
 UNLOCK_CONFIRM_TIMEOUT_S = 5.0
 UNLOCK_POLL_INTERVAL_S = 0.2
+
+# The same, for Lock. Longer on purpose: releasing a locker that is already
+# running is quicker than starting one, and a screen that failed to lock is a
+# worse thing to report wrongly than a screen that failed to unlock.
+LOCK_CONFIRM_TIMEOUT_S = 8.0
+LOCK_POLL_INTERVAL_S = 0.2
 
 _COMMAND_TIMEOUT_S = 10.0
 
@@ -89,6 +110,23 @@ class UnlockResult:
             "session_id": self.session.id,
             "was_locked": self.was_locked,
             "unlocked": self.unlocked,
+            "type": self.session.type,
+            "desktop": self.session.desktop,
+            "seat": self.session.seat,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class LockResult:
+    session: SessionInfo
+    was_locked: bool
+    locked: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "session_id": self.session.id,
+            "was_locked": self.was_locked,
+            "locked": self.locked,
             "type": self.session.type,
             "desktop": self.session.desktop,
             "seat": self.session.seat,
@@ -240,41 +278,74 @@ async def list_own_sessions() -> list[SessionInfo]:
     return result
 
 
-def _rank(session: SessionInfo) -> tuple[int, int, int]:
-    """Sort key: locked sessions first, then active ones, then lowest id.
+def _tiebreak(session: SessionInfo) -> tuple[int, int]:
+    """Shared tail of both sort keys: active sessions first, then lowest id."""
+    numeric = int(session.id) if session.id.isdigit() else 1_000_000
+    return (0 if session.active else 1, numeric)
+
+
+def _rank_for_unlock(session: SessionInfo) -> tuple[int, int, int]:
+    """Locked sessions first.
 
     A locked session is precisely the one worth unlocking, so it outranks an
     active-but-unlocked one on a multi-seat box.
     """
-    numeric = int(session.id) if session.id.isdigit() else 1_000_000
-    return (0 if session.locked else 1, 0 if session.active else 1, numeric)
+    return (0 if session.locked else 1, *_tiebreak(session))
 
 
-async def find_unlock_target(session_id: str | None = None) -> SessionInfo:
-    """Choose the session to unlock.
+def _rank_for_lock(session: SessionInfo) -> tuple[int, int, int]:
+    """Unlocked sessions first -- the exact inverse of :func:`_rank_for_unlock`.
 
-    An explicit id must still belong to us and be graphical -- the caller cannot
-    steer this at someone else's session.
+    Deliberately a separate function rather than a flag on one. Reusing the
+    unlock ranking here would send a lock request at a session that is already
+    locked, change nothing, and report success; on a single-session desktop the
+    two rankings agree and that bug never shows itself.
     """
+    return (0 if not session.locked else 1, *_tiebreak(session))
+
+
+async def _validate_explicit_target(session_id: str) -> SessionInfo:
+    """Check a caller-supplied session id.
+
+    Shared by both operations: whichever way it is going, a caller must not be
+    able to steer this at someone else's session or at a non-graphical one.
+    """
+    if not SESSION_ID_RE.match(session_id):
+        raise ApiError("bad_request", "malformed session id")
+    info = await describe_session(session_id)
+    if info is None:
+        raise ApiError("no_session", f"no session {session_id!r}")
+    if info.uid != os.getuid():
+        raise ApiError("no_session", f"session {session_id!r} belongs to another user")
+    if not info.is_graphical:
+        raise ApiError(
+            "no_session", f"session {session_id!r} is {info.klass}/{info.type}, not graphical"
+        )
+    return info
+
+
+async def _find_target(
+    session_id: str | None,
+    rank: Callable[[SessionInfo], tuple[int, int, int]],
+) -> SessionInfo:
     if session_id is not None:
-        if not SESSION_ID_RE.match(session_id):
-            raise ApiError("bad_request", "malformed session id")
-        info = await describe_session(session_id)
-        if info is None:
-            raise ApiError("no_session", f"no session {session_id!r}")
-        if info.uid != os.getuid():
-            raise ApiError("no_session", f"session {session_id!r} belongs to another user")
-        if not info.is_graphical:
-            raise ApiError(
-                "no_session", f"session {session_id!r} is {info.klass}/{info.type}, not graphical"
-            )
-        return info
+        return await _validate_explicit_target(session_id)
 
     candidates = [s for s in await list_own_sessions() if s.is_graphical]
     if not candidates:
         raise ApiError("no_session", "no graphical session found for this user")
-    candidates.sort(key=_rank)
+    candidates.sort(key=rank)
     return candidates[0]
+
+
+async def find_unlock_target(session_id: str | None = None) -> SessionInfo:
+    """Choose the session to unlock (PROTOCOL.md 6.1)."""
+    return await _find_target(session_id, _rank_for_unlock)
+
+
+async def find_lock_target(session_id: str | None = None) -> SessionInfo:
+    """Choose the session to lock (PROTOCOL.md 6.2)."""
+    return await _find_target(session_id, _rank_for_lock)
 
 
 async def unlock_session(session_id: str | None = None) -> UnlockResult:
@@ -293,7 +364,12 @@ async def unlock_session(session_id: str | None = None) -> UnlockResult:
             f"loginctl unlock-session failed: {stderr or f'exit {rc}'}",
         )
 
-    confirmed = await _await_unlocked(target.id)
+    confirmed = await _await_locked_hint(
+        target.id,
+        want=False,
+        timeout=UNLOCK_CONFIRM_TIMEOUT_S,
+        interval=UNLOCK_POLL_INTERVAL_S,
+    )
     if not confirmed:
         raise ApiError(
             "unlock_failed",
@@ -308,23 +384,69 @@ async def unlock_session(session_id: str | None = None) -> UnlockResult:
     return UnlockResult(session=final, was_locked=True, unlocked=True)
 
 
-async def _await_unlocked(session_id: str) -> bool:
-    """Poll LockedHint until it clears or the timeout elapses.
+async def lock_session(session_id: str | None = None) -> LockResult:
+    """Lock the graphical session and confirm the state actually changed."""
+    target = await find_lock_target(session_id)
 
-    The screen locker reacts to logind's signal asynchronously and then clears the
-    hint, so a single immediate read would race and usually lose.
+    if target.locked:
+        # Idempotent, mirroring unlock: asking to lock a locked session is a
+        # success, not an error. A second tap on a flaky connection must not
+        # read as a failure.
+        return LockResult(session=target, was_locked=True, locked=True)
+
+    rc, _, stderr = await _run("lock-session", target.id)
+    if rc != 0:
+        raise ApiError(
+            "lock_failed",
+            f"loginctl lock-session failed: {stderr or f'exit {rc}'}",
+        )
+
+    confirmed = await _await_locked_hint(
+        target.id,
+        want=True,
+        timeout=LOCK_CONFIRM_TIMEOUT_S,
+        interval=LOCK_POLL_INTERVAL_S,
+    )
+    if not confirmed:
+        # A different failure from unlock's, and worth wording differently.
+        # There, a locker was running and would not let go. Here, most likely
+        # nothing was listening for logind's Lock signal at all -- so the screen
+        # is still open, which is the dangerous direction to be wrong in.
+        raise ApiError(
+            "lock_failed",
+            "logind accepted the lock but no screen locker engaged within "
+            "{:.0f}s, so the session is still unlocked. Locking needs a locker "
+            "listening for logind's Lock signal (KDE Plasma and GNOME are; bare "
+            "swaylock and i3lock are not).".format(LOCK_CONFIRM_TIMEOUT_S),
+        )
+
+    final = await describe_session(target.id) or target
+    return LockResult(session=final, was_locked=False, locked=True)
+
+
+async def _await_locked_hint(
+    session_id: str,
+    *,
+    want: bool,
+    timeout: float,
+    interval: float,
+) -> bool:
+    """Poll LockedHint until it reaches ``want``, or the timeout elapses.
+
+    The screen locker reacts to logind's signal asynchronously and only then
+    updates the hint, so a single immediate read would race and usually lose.
     """
     loop = asyncio.get_running_loop()
-    deadline = loop.time() + UNLOCK_CONFIRM_TIMEOUT_S
+    deadline = loop.time() + timeout
     while True:
         info = await describe_session(session_id)
         if info is None:
             return False
-        if not info.locked:
+        if info.locked == want:
             return True
         if loop.time() >= deadline:
             return False
-        await asyncio.sleep(UNLOCK_POLL_INTERVAL_S)
+        await asyncio.sleep(interval)
 
 
 async def current_session() -> SessionInfo | None:

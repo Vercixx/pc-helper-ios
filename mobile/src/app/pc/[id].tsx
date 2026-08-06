@@ -48,7 +48,7 @@ import {
 import { usePCActions } from "@/actions/usePCActions";
 import { useLocale, useT, type MessageKey } from "@/i18n";
 import { usePCStore } from "@/state/store";
-import type { PCStatusSnapshot } from "@/state/types";
+import type { LinkedPC, PCStatusSnapshot } from "@/state/types";
 import { isWidgetStorageWorking } from "@/state/widgetBridge";
 import { Screen } from "@/ui/Screen";
 import { statusColor, statusSymbol } from "@/ui/status";
@@ -65,7 +65,7 @@ export default function PCDetailScreen() {
   const status = usePCStore(useCallback((state) => (id ? state.statuses[id] : undefined), [id]));
   const removePC = usePCStore((state) => state.removePC);
 
-  const { busy, feedback, refresh, wake, unlock } = usePCActions(pc);
+  const { busy, feedback, refresh, wake, unlock, lock } = usePCActions(pc);
 
   // Once, on entry. `refresh` keeps a stable identity for as long as this PC is
   // the one on screen, so this is a mount effect and not a poll loop.
@@ -105,8 +105,8 @@ export default function PCDetailScreen() {
     );
 
   const canWake = pc.wake.macs.length > 0;
-  const canUnlock = pc.capabilities.includes("unlock");
   const anyBusy = busy !== null;
+  const session = sessionAction(pc, status, busy, t);
 
   return (
     <>
@@ -175,12 +175,17 @@ export default function PCDetailScreen() {
                     glassId="wake"
                     namespace={glassNamespace}
                   />
+                  {/* One capsule for both directions -- a locked session
+                      cannot be locked and an unlocked one cannot be unlocked,
+                      so offering both would always leave one of them dead.
+                      `glassId` stays "session" across the flip so the glass
+                      morphs rather than restarting. */}
                   <ActionButton
-                    label={busy === "unlock" ? t("status.unlocking") : t("action.unlock")}
-                    symbol="lock.open"
-                    disabled={!canUnlock || anyBusy}
-                    onPress={() => void unlock()}
-                    glassId="unlock"
+                    label={session.label}
+                    symbol={session.symbol}
+                    disabled={session.disabled || anyBusy}
+                    onPress={() => void (session.verb === "lock" ? lock() : unlock())}
+                    glassId="session"
                     namespace={glassNamespace}
                   />
                   <ActionButton
@@ -266,7 +271,7 @@ function ActionButton({
   namespace,
 }: {
   label: string;
-  symbol: "power" | "lock.open" | "arrow.clockwise";
+  symbol: "power" | "lock.open" | "lock.fill" | "arrow.clockwise";
   onPress: () => void;
   disabled: boolean;
   prominent?: boolean;
@@ -294,6 +299,49 @@ function ActionButton({
       </HStack>
     </Button>
   );
+}
+
+/**
+ * Which way the session button points.
+ *
+ * Driven by the last known lock state rather than offered as a pair, because
+ * the two are mutually exclusive: there is never a moment when both locking and
+ * unlocking make sense. An unknown state -- never polled, or the PC is asleep --
+ * falls back to Unlock and disables it, so the button never invites a tap whose
+ * outcome nobody can predict.
+ */
+function sessionAction(
+  pc: LinkedPC,
+  status: PCStatusSnapshot | undefined,
+  busy: string | null,
+  t: (key: MessageKey) => string,
+): {
+  verb: "lock" | "unlock";
+  label: string;
+  symbol: "lock.open" | "lock.fill";
+  disabled: boolean;
+} {
+  const canUnlock = pc.capabilities.includes("unlock");
+  const canLock = pc.capabilities.includes("lock");
+
+  // Only when the PC is reachable *and* has told us it is unlocked. `locked`
+  // is null when nobody is logged in, which is neither.
+  const showLock = canLock && status?.reachable === true && status.locked === false;
+
+  if (showLock) {
+    return {
+      verb: "lock",
+      label: busy === "lock" ? t("status.locking") : t("action.lock"),
+      symbol: "lock.fill",
+      disabled: false,
+    };
+  }
+  return {
+    verb: "unlock",
+    label: busy === "unlock" ? t("status.unlocking") : t("action.unlock"),
+    symbol: "lock.open",
+    disabled: !canUnlock,
+  };
 }
 
 /** A short value, on the same line as its label -- the Form idiom. */

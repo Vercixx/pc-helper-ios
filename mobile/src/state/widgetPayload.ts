@@ -12,7 +12,17 @@
 
 import type { LinkedPC, PCStatusSnapshot } from "./types";
 
-export const WIDGET_PAYLOAD_VERSION = 1;
+/**
+ * Bumped to 2 when `canLock` was added.
+ *
+ * The version gate is what makes adding a field safe. A state file written by
+ * an older build has no `canLock`, and `PC` decodes it as a non-optional Bool,
+ * so the whole payload would be rejected anyway -- but by an incidental
+ * `try?` rather than on purpose. Bumping says it out loud: the readers see a
+ * version they do not know, report "no PC is paired", and the app rewrites the
+ * file the next time it runs.
+ */
+export const WIDGET_PAYLOAD_VERSION = 2;
 
 export type WidgetSnapshot = {
   reachable: boolean;
@@ -35,6 +45,7 @@ export type WidgetPC = {
   broadcast: string;
   wakePort: number;
   canUnlock: boolean;
+  canLock: boolean;
   status: WidgetSnapshot | null;
 };
 
@@ -72,6 +83,7 @@ export function buildWidgetPayload(
         broadcast: pc.wake.broadcast,
         wakePort: pc.wake.port,
         canUnlock: pc.capabilities.includes("unlock"),
+        canLock: pc.capabilities.includes("lock"),
         status: status
           ? {
               reachable: status.reachable,

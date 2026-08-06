@@ -1,12 +1,13 @@
 # Shortcuts, Siri and Control Center
 
-Three App Intents, in the **app target**:
+Four App Intents, in the **app target**:
 
 | Action | Signed | Needs the phone unlocked |
 | --- | --- | --- |
 | **Wake PC** | no — a magic packet is unauthenticated UDP | no |
 | **Get PC status** | yes, both directions | no |
 | **Unlock PC session** | yes, both directions | **yes** |
+| **Lock PC session** | yes, both directions | no |
 
 Each takes a PC parameter backed by an `AppEntity`, so a shortcut reads
 "Wake *Desktop*" and defaults to the only paired PC. Siri phrases are registered
@@ -60,7 +61,7 @@ Responses are verified against the pinned server key **before the body is
 parsed**. Without that, anything on the LAN could answer on the PC's behalf and,
 for `/v1/unlock`, claim a success it never performed.
 
-## Why Unlock asks for Face ID
+## Why Unlock asks for Face ID and Lock does not
 
 ```swift
 static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
@@ -75,6 +76,14 @@ prevent.
 Wake carries no such policy, deliberately. A magic packet is unauthenticated UDP
 that anyone already on the LAN can send, and the worst it can do is turn a
 computer on.
+
+**Neither does Lock, and that is the whole point of it.** The trade runs the
+other way: locking a session cannot let anyone in, and the worst it can do is
+cost its owner a password prompt. The moment you actually want it is the moment
+you have walked away from an unlocked desk with a phone you have not unlocked —
+so requiring authentication would put the gate exactly where it does no good and
+the most harm. `LockPCIntent` has no `authenticationPolicy` line for that reason,
+and the omission is documented at the point where it is missing.
 
 ## Known limits
 

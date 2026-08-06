@@ -228,6 +228,7 @@ class Config:
     wake_targets: tuple[WakeTarget, ...] = ()
     mdns_enabled: bool = True
     unlock_enabled: bool = True
+    lock_enabled: bool = True
     state_dir: Path = field(default_factory=state_dir)
     source_path: Path | None = None
 
@@ -238,6 +239,8 @@ class Config:
             caps.append("wol")
         if self.unlock_enabled:
             caps.append("unlock")
+        if self.lock_enabled:
+            caps.append("lock")
         return tuple(sorted(caps))
 
     def wake_target_for(self, mac: str) -> WakeTarget | None:
@@ -334,6 +337,10 @@ def load(path: Path | None = None) -> Config:
     if not isinstance(unlock_enabled, bool):
         raise ConfigError("unlock_enabled must be true or false")
 
+    lock_enabled = raw.get("lock_enabled", True)
+    if not isinstance(lock_enabled, bool):
+        raise ConfigError("lock_enabled must be true or false")
+
     return Config(
         name=name,
         http=HttpConfig.from_toml(raw.get("http", {})),
@@ -341,6 +348,7 @@ def load(path: Path | None = None) -> Config:
         wake_targets=targets,
         mdns_enabled=mdns_enabled,
         unlock_enabled=unlock_enabled,
+        lock_enabled=lock_enabled,
         state_dir=state_dir(),
         source_path=path if path.exists() else None,
     )
@@ -367,6 +375,11 @@ def render_default_toml() -> str:
         "",
         "# Set false to refuse every unlock request regardless of pairing.",
         "unlock_enabled = true",
+        "",
+        "# Locking is the safe half of the pair -- the worst it can do is cost",
+        "# you a password prompt -- so it has its own switch, and turning unlock",
+        "# off does not take it away.",
+        "lock_enabled = true",
         "",
         "[http]",
         f"port = {DEFAULT_PORT}",

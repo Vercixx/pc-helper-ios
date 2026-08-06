@@ -1,13 +1,13 @@
 # wol-unlock
 
-Wake a Linux PC and unlock its desktop session from an iPhone, over the LAN, with
+Wake a Linux PC and lock or unlock its desktop session from an iPhone, over the LAN, with
 no passwords anywhere.
 
 ```
 iPhone (Expo / SwiftUI)                      my-pc (systemd --user)
 ├─ Ed25519 key in the Keychain, Face ID      ├─ mDNS  _wol-unlock._tcp
 ├─ signed HTTP  ─────────────────────────▶   ├─ aiohttp :8765, signature-verified
-└─ UDP magic packet ─────────────────────▶   └─ loginctl unlock-session
+└─ UDP magic packet ─────────────────────▶   └─ loginctl (un)lock-session
    (works while the PC is asleep)               no sudo · no polkit · no setuid
 ```
 
@@ -17,7 +17,7 @@ iPhone (Expo / SwiftUI)                      my-pc (systemd --user)
 | **PC service** | [`pc-service/`](pc-service/) — Python 3.11+, aiohttp, zeroconf |
 | **iOS app** | [`mobile/`](mobile/) — Expo SDK 57, `@expo/ui` SwiftUI |
 | **Installing on a phone** | [`docs/SIDELOADING.md`](docs/SIDELOADING.md) — including the free-account route |
-| **Shortcuts & Siri** | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) — Wake / status / unlock as App Intents |
+| **Shortcuts & Siri** | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) — Wake / status / unlock / lock as App Intents |
 | **Widgets** | [`docs/WIDGETS.md`](docs/WIDGETS.md) — WidgetKit and Control Center, pending an App Group that survives a sideload |
 | **Languages** | [`docs/I18N.md`](docs/I18N.md) — English and Russian, and why five catalogues rather than one |
 
@@ -31,10 +31,11 @@ that includes a timestamp, a single-use nonce, a hash of the body, and *the
 server's own fingerprint* — so a request captured on one PC is worthless against
 another.
 
-**No privilege escalation.** `org.freedesktop.login1.policy` defines no
-`unlock-session` action; logind consults polkit only when the caller's uid
-differs from the session's. Running as the desktop user therefore needs no sudo,
-no setuid binary, and no polkit rule. The systemd unit can then be locked down
+**No privilege escalation.** logind passes the session owner's uid to polkit as
+its `good_user`, which short-circuits the check when the caller's uid matches —
+so a service running as the desktop user is authorized implicitly, for locking
+and unlocking alike. Running as that user therefore needs no sudo, no setuid
+binary, and no polkit rule. The systemd unit can then be locked down
 hard (`ProtectSystem=strict`, `ProtectHome=read-only`, `NoNewPrivileges`,
 `SystemCallFilter=@system-service`) because nothing it does requires privilege.
 
@@ -93,6 +94,11 @@ on it. **KDE Plasma and GNOME do.** Bare `swaylock` and `i3lock` do not and cann
 be unlocked remotely. The service detects this: it re-reads `LockedHint` after
 signalling and reports `unlock_failed` rather than trusting a zero exit code.
 
+Locking depends on the same cooperation in the other direction — `lock-session`
+emits `Lock`, and the service waits for the locker to raise `LockedHint` before
+reporting success, so a screen that never actually locked is reported as
+`lock_failed` rather than silently claimed.
+
 ---
 
 ## Building the app
@@ -134,8 +140,8 @@ while it sleeps. Discovery and unlocking are unaffected.
 ## Verifying it
 
 ```bash
-cd pc-service && .venv/bin/python -m pytest -q     # 194 tests
-cd mobile      && npm test                          # 30 tests
+cd pc-service && .venv/bin/python -m pytest -q     # 233 tests
+cd mobile      && npm test                          # 209 tests
 ```
 
 Both suites assert the *same* vectors from `docs/PROTOCOL.md`, so the Python and

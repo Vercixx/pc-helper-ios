@@ -49,6 +49,15 @@ export type UnlockResponse = {
   seat: string | null;
 };
 
+export type LockResponse = {
+  session_id: string;
+  was_locked: boolean;
+  locked: boolean;
+  type: string;
+  desktop: string | null;
+  seat: string | null;
+};
+
 export type WakeResponse = {
   sent: { mac: string; via: string; bytes: number }[];
 };
@@ -81,6 +90,7 @@ export type ApiErrorCode =
   | "pairing_timeout"
   | "no_session"
   | "unlock_failed"
+  | "lock_failed"
   | "wake_failed"
   | "not_allowed"
   | "internal_error"
@@ -122,6 +132,9 @@ export class ApiError extends Error {
       case "no_session":
         return t("error.no_session");
       case "unlock_failed":
+      case "lock_failed":
+        // The service's own wording, which names the screen locker at fault --
+        // no generic string could say something that specific.
         return this.message;
       case "rate_limited":
         return t("error.rate_limited");

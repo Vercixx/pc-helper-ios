@@ -19,6 +19,7 @@ ROUTES: tuple[tuple[str, str, Any], ...] = (
     ("GET", "/v1/status", handlers.status),
     ("POST", "/v1/wake", handlers.wake),
     ("POST", "/v1/unlock", handlers.unlock),
+    ("POST", "/v1/lock", handlers.lock),
 )
 
 

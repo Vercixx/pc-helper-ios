@@ -23,6 +23,13 @@ struct UnlockOutcome {
   let desktop: String?
 }
 
+struct LockOutcome {
+  let sessionId: String?
+  /// True when the session was *already* locked, so the call changed nothing.
+  let wasLocked: Bool
+  let desktop: String?
+}
+
 enum ClientError: Error, LocalizedError {
   case unreachable
   case unsignedResponse
@@ -67,6 +74,16 @@ enum WUClient {
     let body = Data(#"{"session_id":null}"#.utf8)
     let envelope = try await call(pc: pc, method: "POST", path: "/v1/unlock", body: body)
     return UnlockOutcome(
+      sessionId: envelope.data?.session_id,
+      wasLocked: envelope.data?.was_locked ?? false,
+      desktop: envelope.data?.desktop
+    )
+  }
+
+  static func lock(pc: SharedState.PC) async throws -> LockOutcome {
+    let body = Data(#"{"session_id":null}"#.utf8)
+    let envelope = try await call(pc: pc, method: "POST", path: "/v1/lock", body: body)
+    return LockOutcome(
       sessionId: envelope.data?.session_id,
       wasLocked: envelope.data?.was_locked ?? false,
       desktop: envelope.data?.desktop

@@ -35,6 +35,14 @@ jest.mock("@/api/client", () => ({
     session: { id: "c2", locked: true, desktop: "KDE" },
   })),
   unlockSession: jest.fn(),
+  lockSession: jest.fn(async () => ({
+    session_id: "c2",
+    was_locked: false,
+    locked: true,
+    type: "wayland",
+    desktop: "KDE",
+    seat: "seat0",
+  })),
 }));
 
 jest.mock("@/actions/wake", () => ({
@@ -42,7 +50,8 @@ jest.mock("@/actions/wake", () => ({
   waitUntilAwake: jest.fn(),
 }));
 
-import { getStatus } from "@/api/client";
+import { getStatus, lockSession } from "@/api/client";
+import { confirmBiometrics } from "@/crypto/keys";
 
 const PC: LinkedPC = {
   id: "fp-abc",
@@ -57,7 +66,7 @@ const PC: LinkedPC = {
   keyAlias: "alias-1",
   keyMode: "device-only",
   wake: { macs: ["00:11:22:33:44:55"], broadcast: "255.255.255.255", port: 9 },
-  capabilities: ["unlock", "wake"],
+  capabilities: ["unlock", "lock", "wake"],
   pairedAt: 0,
   lastSeenAt: null,
 };
@@ -195,5 +204,31 @@ describe("updatePC", () => {
     const before = usePCStore.getState().pcs;
     usePCStore.getState().updatePC("nope", { lastIp: "192.0.2.10" });
     expect(usePCStore.getState().pcs).toBe(before);
+  });
+});
+
+describe("lock", () => {
+  it("locks without asking for biometrics", async () => {
+    // The asymmetry that matters: unlock hands whoever holds the phone a live
+    // desktop and is gated; lock costs its owner a password prompt and is not.
+    let actions: ReturnType<typeof usePCActions> | undefined;
+    function Probe() {
+      actions = usePCActions(usePCStore((state) => state.pcs[0]));
+      return null;
+    }
+    let tree!: ReturnType<typeof create>;
+    act(() => {
+      tree = create(<Probe />);
+    });
+
+    await act(async () => {
+      await actions!.lock();
+    });
+    await settle();
+
+    expect(lockSession).toHaveBeenCalledTimes(1);
+    expect(confirmBiometrics).not.toHaveBeenCalled();
+    expect(usePCStore.getState().statuses[PC.id]?.locked).toBe(true);
+    act(() => tree.unmount());
   });
 });

@@ -25,6 +25,7 @@ ERROR_STATUS: dict[str, int] = {
     "pairing_timeout": 409,
     "no_session": 409,
     "unlock_failed": 500,
+    "lock_failed": 500,
     "wake_failed": 500,
     "not_allowed": 403,
     "internal_error": 500,

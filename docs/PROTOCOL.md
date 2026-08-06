@@ -2,8 +2,8 @@
 
 Normative specification. Both the Python service (`pc-service/`) and the iOS app
 (`mobile/`) implement exactly this document. Every construction below has a test
-vector in [§9](#9-test-vectors); an implementation that reproduces those bytes is
-interoperable.
+vector in [§11](#11-test-vectors); an implementation that reproduces those bytes
+is interoperable.
 
 ---
 
@@ -188,6 +188,7 @@ parsing, so serialization differences can never silently pass.
 | `pairing_timeout` | 409 | operator did not answer within 60 s |
 | `no_session` | 409 | no graphical session found for our uid |
 | `unlock_failed` | 500 | `loginctl` failed, or `LockedHint` did not clear |
+| `lock_failed` | 500 | `loginctl` failed, or `LockedHint` did not set |
 | `wake_failed` | 500 | socket error sending the magic packet |
 | `not_allowed` | 403 | wake target absent from the config allowlist |
 | `internal_error` | 500 | unexpected fault |
@@ -207,7 +208,7 @@ Rate-limited like every other endpoint.
 { "ok": true, "ts": 1754390000, "data": {
     "v": 1, "api": 1, "name": "My PC",
     "fp": "JPbtasv-EAnAMNfKVnwzykgwkRSYI2tVYabIKr7F3ig",
-    "caps": ["wol", "unlock", "status"],
+    "caps": ["wol", "unlock", "lock", "status"],
     "pair": false } }
 ```
 
@@ -234,7 +235,7 @@ Response `200`:
     "server_pubkey": "Kay64UG8yvCyLhqU000LxzYeUm0L_hLIl5S8kyKWbdc",
     "server_fp": "JPbtasv-EAnAMNfKVnwzykgwkRSYI2tVYabIKr7F3ig",
     "name": "My PC", "api": 1,
-    "caps": ["wol", "unlock", "status"],
+    "caps": ["wol", "unlock", "lock", "status"],
     "wake": { "macs": ["00:00:5e:00:53:01", "00:00:5e:00:53:02"],
               "broadcast": "192.168.1.255", "port": 9 } } }
 ```
@@ -296,35 +297,97 @@ Idempotent: an already-unlocked session returns `ok: true` with
 `LockedHint` after the call**, so it is a confirmed state change rather than a
 zero exit status.
 
+### 5.6 `POST /v1/lock` — signed
+
+```json
+{ "session_id": null }
+```
+
+`null` means auto-detect (§6.2 — a *different* selection from §6.1, since the
+session worth locking is not the one worth unlocking). Response:
+
+```json
+{ "ok": true, "ts": 1754390000, "data": {
+    "session_id": "1", "was_locked": false, "locked": true,
+    "type": "wayland", "desktop": "KDE", "seat": "seat0" } }
+```
+
+Idempotent the same way, inverted: an already-locked session returns `ok: true`
+with `was_locked: true`, not an error. `locked` reflects a **re-read of
+`LockedHint` after the call**.
+
+Locking is the safe half of this pair and is specified as such. Unlock hands
+whoever holds the phone a live desktop session; lock, at worst, costs its owner
+the effort of typing a password. Clients are expected to gate unlock behind
+device authentication and are expected **not** to gate lock — see
+`mobile/native/WUAppIntents.swift`, where `UnlockPCIntent` requires
+authentication and `LockPCIntent` deliberately does not.
+
 ---
 
 ## 6. Session selection
+
+Candidates are gathered once, the same way for both operations:
 
 1. `loginctl list-sessions --output=json`
 2. Keep sessions whose `uid` equals the service's own uid.
 3. For each, `loginctl show-session <id> --property=Type --property=Class --property=Active --property=LockedHint --property=Seat --value`
 4. Keep `Class == "user"` and `Type ∈ {wayland, x11}` — this drops the
    `Class=manager` session that systemd creates alongside the real one.
-5. Rank: `LockedHint == yes` first (that is the one worth unlocking), then
-   `Active == yes`, then lowest id. Zero candidates → `no_session`.
+5. Rank by §6.1 or §6.2 as appropriate. Zero candidates → `no_session`.
 6. Validate the chosen id against `^[a-zA-Z0-9]{1,32}$` before it is ever passed
    as an argument.
-7. `loginctl unlock-session <id>`, then re-read `LockedHint` to confirm.
+
+An explicit `session_id` skips ranking but not the checks: it must still belong
+to our uid and be graphical, so a caller cannot steer either operation at someone
+else's session.
+
+### 6.1 Ranking for unlock
+
+`LockedHint == yes` first, then `Active == yes`, then lowest id. A locked session
+is precisely the one worth unlocking, so it outranks an active-but-unlocked one
+on a multi-seat box.
+
+Then `loginctl unlock-session <id>`, and re-read `LockedHint` until it **clears**.
+
+### 6.2 Ranking for lock
+
+`LockedHint == no` first, then `Active == yes`, then lowest id.
+
+**This is the inverse of §6.1 and must not be shared with it.** Ranking locked
+sessions first — correct for unlock — would make a lock request target a session
+that is already locked, do nothing, and report success. On a single-session
+desktop the two rankings pick the same session and the bug is invisible, which is
+exactly why it is written down here.
+
+Then `loginctl lock-session <id>`, and re-read `LockedHint` until it **sets**.
+
+### 6.3 Privileges
 
 All invocations use `create_subprocess_exec` with an absolute path and an argument
 vector. No shell is involved anywhere, so no quoting or injection surface exists.
 
-**Why no polkit rule is needed.** `org.freedesktop.login1.policy` defines
-`lock-sessions` but no `unlock-session` action. logind consults polkit only when
-the caller's uid differs from the session's uid; a service running as the session
-owner is authorized implicitly. The service therefore runs with no sudo, no
-setuid, and no polkit rule.
+**Why no polkit rule is needed.** `org.freedesktop.login1.policy` defines a
+single action, `org.freedesktop.login1.lock-sessions`, described as *"Lock or
+unlock active sessions"* — it guards **both** directions, so the absence of a
+separate `unlock-session` action is not the reason either call works.
+
+The reason is the caller's uid. logind passes the session owner's uid to
+`bus_verify_polkit_async` as its `good_user` argument, which returns "authorized"
+before polkit is ever consulted when the calling process's uid matches. That is a
+property of *who is asking*, not of *which verb* — which is why it covers lock
+and unlock alike. A service running as the session owner is therefore authorized
+implicitly, and runs with no sudo, no setuid, and no polkit rule.
 
 **Screen-locker requirement.** `loginctl unlock-session` emits logind's `Unlock`
 signal; the locker must act on it. KDE Plasma does — `libKScreenLocker.so.6`
 contains `LogindIntegration`, `requestUnlock()`, and the code path logged as
 *"Unlocking anyway since forced through logind."* GNOME does too. Bare
 `swaylock`/`i3lock` do **not** and are unsupported.
+
+Locking has the same dependency in the other direction: `lock-session` emits
+`Lock`, and the confirmation in §6.2 waits for the locker to raise `LockedHint`
+in response. A locker that never engages fails the same way, with `lock_failed`.
 
 ---
 
@@ -361,7 +424,7 @@ TXT records:
 | `v` | `1` | TXT schema version |
 | `api` | `1` | HTTP API version |
 | `name` | `My PC` | display name |
-| `caps` | `wol,unlock,status` | comma-separated capabilities |
+| `caps` | `wol,unlock,lock,status` | comma-separated capabilities |
 | `fp` | 43-char b64u | server public key fingerprint |
 | `pair` | `0` / `1` | a pairing window is currently open |
 

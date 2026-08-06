@@ -62,6 +62,16 @@ class TestLoading:
         # unlock disabled -> not advertised as a capability
         assert "unlock" not in config.capabilities
         assert "wol" in config.capabilities
+        # ...but lock has its own switch and is untouched by that.
+        assert config.lock_enabled is True
+        assert "lock" in config.capabilities
+
+    def test_lock_can_be_disabled_independently(self, tmp_path):
+        path = write(tmp_path, 'name = "PC"\nlock_enabled = false\n')
+        config = cfg.load(path)
+        assert config.lock_enabled is False
+        assert "lock" not in config.capabilities
+        assert "unlock" in config.capabilities
 
     @pytest.mark.parametrize(
         "body,match",
@@ -83,6 +93,7 @@ class TestLoading:
             ('[[wake.targets]]\nmac = "aa:bb:cc:dd:ee:ff"\nbroadcast = "1.2.3.255"\n'
              'secureon = "tooshort"', "secureon"),
             ('unlock_enabled = "maybe"', "true or false"),
+            ('lock_enabled = "maybe"', "true or false"),
             ('[mdns]\nenabled = 1', "true or false"),
         ],
     )

@@ -18,7 +18,10 @@ enum SharedState {
   /// is signed with its own profile, so it reads its own.
   static var appGroup: String { Entitlements.sharedAppGroup() }
   static let stateKey = "wolunlock.state"
-  static let currentVersion = 1
+  /// 2 since `canLock`. Must match `WIDGET_PAYLOAD_VERSION` in
+  /// `src/state/widgetPayload.ts` -- a mismatch means every PC reads as
+  /// unpaired until the app republishes.
+  static let currentVersion = 2
 
   struct Endpoint {
     let host: String
@@ -46,6 +49,7 @@ enum SharedState {
     let broadcast: String
     let wakePort: Int
     let canUnlock: Bool
+    let canLock: Bool
     let status: Snapshot?
 
     /// Addresses to try, best first.
