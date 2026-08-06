@@ -27,7 +27,6 @@ import {
   disabled as disabledModifier,
   font,
   foregroundStyle,
-  frame,
   glassEffectId,
   lineLimit,
   listRowBackground,
@@ -241,10 +240,21 @@ export default function PCDetailScreen() {
 /**
  * One of the three glass capsules.
  *
- * `maxWidth` is what makes them span the row rather than shrink to their
- * labels, so all three line up. `lineLimit(1)` is the belt to that braces: if
- * the frame ever fails to apply, the labels still refuse to wrap, and the worst
- * case is three capsules sized to their text instead of three circles.
+ * The label is built by hand rather than passed as `label` + `systemImage`,
+ * which would be the obvious way and does not work: under
+ * `.buttonStyle(.glassProminent)` SwiftUI reserves the icon's slot in the
+ * `Label` and then draws nothing in it, so the Wake button came out with a
+ * blank gap where its power symbol should be while the two plain-glass buttons
+ * beside it drew theirs fine. An `Image` placed in the button's content is just
+ * a view, and renders.
+ *
+ * The `Spacer`s either side are what make the capsule span the row. The obvious
+ * way there, `frame({ maxWidth: Infinity })`, does not survive the trip into a
+ * `CGFloat?` -- the buttons came back sized to their text.
+ *
+ * Neither the image nor the text sets a colour, so both inherit whatever the
+ * button style decides: white on the prominent capsule, the accent on the
+ * others.
  */
 function ActionButton({
   label,
@@ -265,19 +275,24 @@ function ActionButton({
 }) {
   return (
     <Button
-      label={label}
-      systemImage={symbol}
       onPress={onPress}
       modifiers={[
         buttonStyle(prominent ? "glassProminent" : "glass"),
         buttonBorderShape("capsule"),
         controlSize("large"),
-        lineLimit(1),
-        frame({ maxWidth: Infinity }),
         glassEffectId(glassId, namespace),
         disabledModifier(disabled),
       ]}
-    />
+    >
+      <HStack spacing={8}>
+        <Spacer />
+        {/* No `size`: left alone the symbol scales with the button's own font,
+            so it stays optically matched to the label at any Dynamic Type. */}
+        <Image systemName={symbol} />
+        <Text modifiers={[lineLimit(1)]}>{label}</Text>
+        <Spacer />
+      </HStack>
+    </Button>
   );
 }
 
