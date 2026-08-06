@@ -32,7 +32,7 @@ import { useT } from "@/i18n";
 import { usePCStore } from "@/state/store";
 import { PAIR_COMMAND_MARKDOWN } from "@/ui/copy";
 import { Screen } from "@/ui/Screen";
-import { accent, secondaryText, tertiaryText } from "@/ui/theme";
+import { colors, secondaryText, tertiaryText } from "@/ui/theme";
 
 export default function DiscoverScreen() {
   const router = useRouter();
@@ -151,7 +151,7 @@ function ChoiceRow({
   return (
     <Button onPress={onPress} modifiers={[buttonStyle("plain"), accessibilityLabel(title)]}>
       <HStack spacing={14}>
-        <Image systemName={symbol} size={26} modifiers={[foregroundStyle(accent)]} />
+        <Image systemName={symbol} size={26} modifiers={[foregroundStyle(colors.tint)]} />
         <VStack alignment="leading" spacing={2}>
           <Text>{title}</Text>
           {children}
@@ -190,11 +190,11 @@ function DiscoveredRow({
           <Text>{service.displayName}</Text>
           <Spacer />
           {alreadyPaired ? (
-            <Text modifiers={[font({ size: 13 }), foregroundStyle("green")]}>
+            <Text modifiers={[font({ size: 13 }), foregroundStyle(colors.green)]}>
               {t("discover.paired")}
             </Text>
           ) : service.pairingOpen ? (
-            <Text modifiers={[font({ size: 13 }), foregroundStyle(accent)]}>
+            <Text modifiers={[font({ size: 13 }), foregroundStyle(colors.tint)]}>
               {t("discover.pairingOpen")}
             </Text>
           ) : null}

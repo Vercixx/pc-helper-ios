@@ -28,7 +28,7 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Pressable, StyleSheet, Text as RNText } from "react-native";
+import { Pressable, StyleSheet, Text as RNText, type ColorValue } from "react-native";
 
 import { usePCActions } from "@/actions/usePCActions";
 import { useT, type MessageKey } from "@/i18n";
@@ -239,10 +239,10 @@ function PCRow({
   );
 }
 
-function feedbackColor(tone: "success" | "error" | "info") {
-  if (tone === "error") return "red";
-  if (tone === "success") return "green";
-  return "secondary";
+function feedbackColor(tone: "success" | "error" | "info"): ColorValue {
+  if (tone === "error") return colors.red;
+  if (tone === "success") return colors.green;
+  return colors.secondaryLabel;
 }
 
 function describe(

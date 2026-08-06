@@ -23,24 +23,29 @@ export const colors = {
   groupedBackground: PlatformColor("systemGroupedBackground"),
   separator: PlatformColor("separator"),
   tint: PlatformColor("systemBlue"),
+  green: PlatformColor("systemGreen"),
+  red: PlatformColor("systemRed"),
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 
 /**
- * Status colours for the SwiftUI side.
+ * Status colours.
  *
- * These cannot come from `colors` above: SwiftUI's `Image color` prop takes a
- * plain string, not a `PlatformColor`. They are SwiftUI's own named colours
- * rather than hex literals because SwiftUI resolves those per appearance -- the
- * hexes that used to live inline in the list and detail screens were the *dark*
- * variants of systemOrange and systemGreen, and stayed dark in light mode.
+ * `PlatformColor`, not the colour *names* `@expo/ui` advertises. Those names
+ * are a trap: the bridge tries expo-modules' `UIColor` convertible first, and
+ * its table is the CSS3/SVG palette, so `"blue"` is #0000FF and `"green"` is
+ * #008000 -- web colours, fixed, and nothing like the system ones. SwiftUI's
+ * own palette is only reached by names CSS happens not to define (`primary`,
+ * `secondary`, `clear`, `mint`). A `PlatformColor` arrives as
+ * `{semantic: ["systemGreen"]}`, which the same convertible resolves against
+ * `UIColor`, so it is the real, appearance-adaptive system colour.
  */
 export const statusColors = {
   /** Unknown, unreachable, or asleep. */
-  unknown: "gray",
-  locked: "orange",
-  unlocked: "green",
+  unknown: PlatformColor("systemGray"),
+  locked: PlatformColor("systemOrange"),
+  unlocked: PlatformColor("systemGreen"),
 } as const;
 
 /**
@@ -54,13 +59,6 @@ export const statusColors = {
  */
 export const secondaryText = foregroundStyle({ type: "hierarchical", style: "secondary" });
 export const tertiaryText = foregroundStyle({ type: "hierarchical", style: "tertiary" });
-
-/**
- * The accent. `"blue"` is `Color.blue`, which is systemBlue and adapts to the
- * appearance -- the same colour `colors.tint` resolves to on the React Native
- * side, and the one the widget already uses.
- */
-export const accent = "blue";
 
 export const styles = StyleSheet.create({
   screen: {

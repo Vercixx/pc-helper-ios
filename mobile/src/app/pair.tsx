@@ -50,7 +50,7 @@ import { CODE_LENGTH, normalizeCode } from "@/crypto/canonical";
 import { useT } from "@/i18n";
 import { PAIR_COMMAND_MARKDOWN } from "@/ui/copy";
 import { Screen } from "@/ui/Screen";
-import { secondaryText } from "@/ui/theme";
+import { colors, secondaryText } from "@/ui/theme";
 
 type Params = {
   host?: string;
@@ -188,7 +188,7 @@ export default function PairScreen() {
             title={t("pair.address.label")}
             footer={
               !portReady ? (
-                <Text modifiers={[font({ size: 13 }), foregroundStyle("red")]}>
+                <Text modifiers={[font({ size: 13 }), foregroundStyle(colors.red)]}>
                   {t("pair.port.range")}
                 </Text>
               ) : undefined
@@ -251,7 +251,7 @@ export default function PairScreen() {
 
           {error ? (
             <Section>
-              <Text modifiers={[foregroundStyle("red"), lineLimit()]}>{error}</Text>
+              <Text modifiers={[foregroundStyle(colors.red), lineLimit()]}>{error}</Text>
             </Section>
           ) : null}
 

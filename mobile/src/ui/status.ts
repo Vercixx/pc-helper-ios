@@ -3,6 +3,8 @@
  * and the detail screen so the two can never disagree about what "asleep" means.
  */
 
+import type { ColorValue } from "react-native";
+
 import type { PCStatusSnapshot } from "@/state/types";
 import { statusColors } from "@/ui/theme";
 
@@ -11,7 +13,7 @@ export function statusSymbol(status: PCStatusSnapshot | undefined) {
   return status.locked ? ("lock.fill" as const) : ("desktopcomputer" as const);
 }
 
-export function statusColor(status: PCStatusSnapshot | undefined): string {
+export function statusColor(status: PCStatusSnapshot | undefined): ColorValue {
   if (!status || !status.reachable) return statusColors.unknown;
   return status.locked ? statusColors.locked : statusColors.unlocked;
 }

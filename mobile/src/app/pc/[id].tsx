@@ -27,6 +27,7 @@ import {
   disabled as disabledModifier,
   font,
   foregroundStyle,
+  frame,
   glassEffectId,
   lineLimit,
   listRowBackground,
@@ -35,7 +36,7 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useId } from "react";
-import { Alert } from "react-native";
+import { Alert, type ColorValue } from "react-native";
 
 import {
   appGroups,
@@ -52,7 +53,7 @@ import type { PCStatusSnapshot } from "@/state/types";
 import { isWidgetStorageWorking } from "@/state/widgetBridge";
 import { Screen } from "@/ui/Screen";
 import { statusColor, statusSymbol } from "@/ui/status";
-import { secondaryText } from "@/ui/theme";
+import { colors, secondaryText } from "@/ui/theme";
 
 export default function PCDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -154,48 +155,44 @@ export default function PCDetailScreen() {
                 </Text>
               ) : undefined
             }
+            // `"clear"` is safe where a colour *name* would not be: CSS has no
+            // "clear" (it calls it "transparent"), so the string falls past the
+            // web palette and reaches SwiftUI's own `.clear`.
             modifiers={[listRowBackground("clear")]}
           >
+            {/* Stacked, not side by side. Three of these labels sharing one
+                row's width leaves each about a third of it, which is narrower
+                than "Unlock session" -- SwiftUI wraps and hyphenates, and a
+                capsule drawn around three lines of text is a circle. */}
             <Namespace id={glassNamespace}>
               <GlassEffectContainer spacing={12}>
-                <HStack spacing={12}>
-                  <Button
+                <VStack spacing={12}>
+                  <ActionButton
                     label={busy === "wake" ? t("status.waking") : t("action.wake")}
-                    systemImage="power"
+                    symbol="power"
+                    prominent
+                    disabled={!canWake || anyBusy}
                     onPress={() => void wake()}
-                    modifiers={[
-                      buttonStyle("glassProminent"),
-                      buttonBorderShape("capsule"),
-                      controlSize("large"),
-                      glassEffectId("wake", glassNamespace),
-                      disabledModifier(!canWake || anyBusy),
-                    ]}
+                    glassId="wake"
+                    namespace={glassNamespace}
                   />
-                  <Button
+                  <ActionButton
                     label={busy === "unlock" ? t("status.unlocking") : t("action.unlock")}
-                    systemImage="lock.open"
+                    symbol="lock.open"
+                    disabled={!canUnlock || anyBusy}
                     onPress={() => void unlock()}
-                    modifiers={[
-                      buttonStyle("glass"),
-                      buttonBorderShape("capsule"),
-                      controlSize("large"),
-                      glassEffectId("unlock", glassNamespace),
-                      disabledModifier(!canUnlock || anyBusy),
-                    ]}
+                    glassId="unlock"
+                    namespace={glassNamespace}
                   />
-                  <Button
+                  <ActionButton
                     label={t("action.refresh")}
-                    systemImage="arrow.clockwise"
+                    symbol="arrow.clockwise"
+                    disabled={anyBusy}
                     onPress={() => void refresh()}
-                    modifiers={[
-                      buttonStyle("glass"),
-                      buttonBorderShape("capsule"),
-                      controlSize("large"),
-                      glassEffectId("refresh", glassNamespace),
-                      disabledModifier(anyBusy),
-                    ]}
+                    glassId="refresh"
+                    namespace={glassNamespace}
                   />
-                </HStack>
+                </VStack>
               </GlassEffectContainer>
             </Namespace>
           </Section>
@@ -241,6 +238,49 @@ export default function PCDetailScreen() {
   );
 }
 
+/**
+ * One of the three glass capsules.
+ *
+ * `maxWidth` is what makes them span the row rather than shrink to their
+ * labels, so all three line up. `lineLimit(1)` is the belt to that braces: if
+ * the frame ever fails to apply, the labels still refuse to wrap, and the worst
+ * case is three capsules sized to their text instead of three circles.
+ */
+function ActionButton({
+  label,
+  symbol,
+  onPress,
+  disabled,
+  prominent,
+  glassId,
+  namespace,
+}: {
+  label: string;
+  symbol: "power" | "lock.open" | "arrow.clockwise";
+  onPress: () => void;
+  disabled: boolean;
+  prominent?: boolean;
+  glassId: string;
+  namespace: string;
+}) {
+  return (
+    <Button
+      label={label}
+      systemImage={symbol}
+      onPress={onPress}
+      modifiers={[
+        buttonStyle(prominent ? "glassProminent" : "glass"),
+        buttonBorderShape("capsule"),
+        controlSize("large"),
+        lineLimit(1),
+        frame({ maxWidth: Infinity }),
+        glassEffectId(glassId, namespace),
+        disabledModifier(disabled),
+      ]}
+    />
+  );
+}
+
 /** A short value, on the same line as its label -- the Form idiom. */
 function Detail({ label, value }: { label: string; value: string }) {
   return (
@@ -279,10 +319,10 @@ function StackedDetail({
   );
 }
 
-function feedbackColor(tone: "success" | "error" | "info") {
-  if (tone === "error") return "red";
-  if (tone === "success") return "green";
-  return "secondary";
+function feedbackColor(tone: "success" | "error" | "info"): ColorValue {
+  if (tone === "error") return colors.red;
+  if (tone === "success") return colors.green;
+  return colors.secondaryLabel;
 }
 
 /**
